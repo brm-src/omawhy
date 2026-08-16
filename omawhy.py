@@ -63,7 +63,7 @@ def window_at_cursor(clients, x, y):
     return None
 
 
-def action_command(action, window):
+def action_command(action, window, current_workspace=None):
     """Return an argv-only command; never interpolate a selected window into a shell."""
     address = str(window.get("address") or "")
     if action == "copy-app-id":
@@ -76,17 +76,23 @@ def action_command(action, window):
         return ["wl-copy", "\n".join(build_remembered_rules(window))]
     if not address:
         raise ValueError("La ventana no tiene dirección Hyprland.")
+    if not re.fullmatch(r"0x[0-9a-fA-F]+", address):
+        raise ValueError("La dirección Hyprland no es válida.")
     selector = "address:" + address
+    if action == "move-current":
+        workspace = int(current_workspace or 0)
+        if workspace <= 0:
+            raise ValueError("No se pudo determinar el workspace actual.")
+        return ["hyprctl", "dispatch", 'hl.dsp.window.move({ workspace = "' + str(workspace) + '", window = "' + selector + '" })']
     dispatches = {
-        "move-current": ["movetoworkspace", "current," + selector],
-        "center": ["centerwindow", selector],
-        "toggle-floating": ["togglefloating", selector],
-        "toggle-fullscreen": ["fullscreen", "0," + selector],
-        "toggle-pin": ["pin", selector],
+        "center": 'hl.dsp.window.center({ window = "' + selector + '" })',
+        "toggle-floating": 'hl.dsp.window.float({ action = "toggle", window = "' + selector + '" })',
+        "toggle-fullscreen": 'hl.dsp.window.fullscreen({ mode = "fullscreen", action = "toggle", window = "' + selector + '" })',
+        "toggle-pin": 'hl.dsp.window.pin({ action = "toggle", window = "' + selector + '" })',
     }
     if action not in dispatches:
         raise ValueError("Acción no reconocida: " + action)
-    return ["hyprctl", "dispatch", *dispatches[action]]
+    return ["hyprctl", "dispatch", dispatches[action]]
 
 
 def inspect_window_at_cursor(clients, cursor, monitors):
@@ -230,7 +236,8 @@ def main(argv=None):
             return _emit({"ok": True, "window": window})
         if args.command == "action":
             window = json.loads(args.window_json)
-            completed = subprocess.run(action_command(args.action, window), text=True, capture_output=True, check=False)
+            current_workspace = _hypr_json("activeworkspace").get("id") if args.action == "move-current" else None
+            completed = subprocess.run(action_command(args.action, window, current_workspace=current_workspace), text=True, capture_output=True, check=False)
             if completed.returncode:
                 raise RuntimeError((completed.stderr or completed.stdout or "La acción falló").strip())
             return _emit({"ok": True, "message": "Acción aplicada."})

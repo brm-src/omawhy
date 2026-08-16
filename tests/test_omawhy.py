@@ -147,16 +147,16 @@ class NormalizeWindowTests(unittest.TestCase):
         window = {"address": "0xabc", "identifier": "firefox", "title": "YouTube"}
 
         self.assertEqual(
-            action_command("move-current", window),
-            ["hyprctl", "dispatch", "movetoworkspace", "current,address:0xabc"],
+            action_command("move-current", window, current_workspace=3),
+            ["hyprctl", "dispatch", 'hl.dsp.window.move({ workspace = "3", window = "address:0xabc" })'],
         )
         self.assertEqual(
             action_command("toggle-floating", window),
-            ["hyprctl", "dispatch", "togglefloating", "address:0xabc"],
+            ["hyprctl", "dispatch", 'hl.dsp.window.float({ action = "toggle", window = "address:0xabc" })'],
         )
         self.assertEqual(
             action_command("toggle-fullscreen", window),
-            ["hyprctl", "dispatch", "fullscreen", "0,address:0xabc"],
+            ["hyprctl", "dispatch", 'hl.dsp.window.fullscreen({ mode = "fullscreen", action = "toggle", window = "address:0xabc" })'],
         )
         self.assertEqual(action_command("copy-app-id", window), ["wl-copy", "firefox"])
 

@@ -19,7 +19,7 @@ The second command adds exactly one marked binding to `~/.config/hypr/bindings.c
 Super + Shift + I
 ```
 
-It does not use sudo, install packages, access the network, or run automatically during `omarchy plugin add`.
+It does not install packages, elevate permissions, access the network, or run automatically during `omarchy plugin add`.
 
 ## Use
 
