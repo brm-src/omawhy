@@ -47,6 +47,28 @@ def build_remembered_rules(window):
     return rules
 
 
+def build_remembered_lua_rule(window):
+    """Generate a Lua rule using only documented Omarchy rule properties."""
+    identifier = str(window.get("identifier") or "")
+    if not identifier:
+        raise ValueError("La ventana no expone app_id/class; no es seguro crear una regla.")
+    matcher = ("^" + re.escape(identifier) + "$").replace("\\", "\\\\").replace('"', '\\"')
+    effects = []
+    workspace = int(window.get("workspace") or 0)
+    monitor = str(window.get("monitor") or "")
+    if workspace > 0:
+        effects.append('workspace = "' + str(workspace) + '"')
+    if monitor:
+        effects.append('monitor = "' + monitor.replace("\\", "\\\\").replace('"', '\\"') + '"')
+    if window.get("fullscreen"):
+        effects.append("fullscreen = true")
+    else:
+        effects.append("float = " + ("true" if window.get("floating") else "false"))
+    if window.get("pinned"):
+        effects.append("pin = true")
+    return 'o.window("' + matcher + '", { ' + ", ".join(effects) + " })"
+
+
 def window_at_cursor(clients, x, y):
     """Return the top-most visible client covering a global cursor point."""
     for client in reversed(clients):
@@ -61,6 +83,271 @@ def window_at_cursor(clients, x, y):
         if left <= x < left + width and top <= y < top + height:
             return client
     return None
+
+
+PLACEMENT_EFFECTS = {"workspace", "monitor", "float", "fullscreen", "pin", "move", "size"}
+
+
+def _split_top_level(value):
+    parts, start, depth, quote, escaped = [], 0, 0, None, False
+    for index, char in enumerate(value):
+        if quote:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == quote:
+                quote = None
+        elif char in "\"'":
+            quote = char
+        elif char in "({[":
+            depth += 1
+        elif char in ")}]":
+            depth -= 1
+        elif char == "," and depth == 0:
+            parts.append(value[start:index].strip())
+            start = index + 1
+    parts.append(value[start:].strip())
+    return [part for part in parts if part]
+
+
+def _lua_value(value):
+    value = value.strip()
+    if len(value) >= 2 and value[0] in "\"'" and value[-1] == value[0]:
+        return value[1:-1].replace("\\\"", "\"").replace("\\\\", "\\")
+    if value == "true":
+        return True
+    if value == "false":
+        return False
+    return value
+
+
+def _lua_table(value):
+    value = value.strip()
+    if not (value.startswith("{") and value.endswith("}")):
+        return {}
+    fields = {}
+    for item in _split_top_level(value[1:-1]):
+        if "=" not in item:
+            continue
+        key, raw_value = item.split("=", 1)
+        key = key.strip()
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
+            fields[key] = _lua_value(raw_value)
+    return fields
+
+
+def _lua_calls(text):
+    """Yield complete o.window(...) calls, including multi-line tables."""
+    needle, cursor = "o.window(", 0
+    while True:
+        start = text.find(needle, cursor)
+        if start < 0:
+            return
+        position, depth, quote, escaped = start + len(needle), 1, None, False
+        while position < len(text) and depth:
+            char = text[position]
+            if quote:
+                if escaped:
+                    escaped = False
+                elif char == "\\":
+                    escaped = True
+                elif char == quote:
+                    quote = None
+            elif char in "\"'":
+                quote = char
+            elif char == "(":
+                depth += 1
+            elif char == ")":
+                depth -= 1
+            position += 1
+        if depth == 0:
+            yield text[start + len(needle):position - 1], text.count("\n", 0, start) + 1, start
+        cursor = position
+
+
+def _resolve_lua_module(module, home, omarchy_root):
+    pieces = module.split(".")
+    if pieces and pieces[0] == "hypr":
+        return home / ".config" / "hypr" / ("/".join(pieces[1:]) + ".lua")
+    if pieces[:2] == ["default", "hypr"]:
+        return omarchy_root / "default" / "hypr" / ("/".join(pieces[2:]) + ".lua")
+    return None
+
+
+def _discover_conf_files(home):
+    root = home / ".config" / "hypr" / "hyprland.conf"
+    if not root.exists():
+        return []
+    discovered, pending = [], [root]
+    while pending:
+        path = pending.pop(0).resolve()
+        if path in discovered or not path.exists():
+            continue
+        discovered.append(path)
+        for source in re.findall(r"^\s*source\s*=\s*(.*?)\s*$", path.read_text(encoding="utf-8", errors="replace"), re.MULTILINE):
+            expanded = Path(source.strip().replace("~", str(home), 1))
+            candidates = sorted(expanded.parent.glob(expanded.name)) if any(mark in source for mark in "*?[") else [expanded]
+            pending.extend(candidate for candidate in candidates if candidate.exists())
+    return discovered
+
+
+def _matches_window(match, window, tags):
+    identifier, title = str(window.get("identifier") or ""), str(window.get("title") or "")
+    for key, expected in match.items():
+        if key == "class":
+            try:
+                if not re.search(str(expected), identifier):
+                    return False
+            except re.error:
+                return False
+        elif key == "title":
+            try:
+                if not re.search(str(expected), title):
+                    return False
+            except re.error:
+                return False
+        elif key == "tag" and str(expected).lstrip("+-") not in tags:
+            return False
+        elif key == "xwayland" and bool(expected) != (window.get("identifier_kind") == "class"):
+            return False
+    return bool(match)
+
+
+def _normalize_effects(effects):
+    normalized = {}
+    for key, value in effects.items():
+        if key in {"float", "fullscreen", "pin"}:
+            normalized[key] = value is True or str(value).lower() in {"on", "true", "1"}
+        elif key in {"workspace", "monitor"}:
+            normalized[key] = str(value).replace(" silent", "").strip()
+        else:
+            normalized[key] = value
+    return normalized
+
+
+def _effect_state(effects, window):
+    state = {}
+    for key, value in effects.items():
+        if key == "workspace":
+            state[key] = "matches" if str(window.get(key)) == str(value) else "differs"
+        elif key == "monitor":
+            state[key] = "matches" if str(window.get(key)) == str(value) else "differs"
+        elif key == "float":
+            state[key] = "matches" if bool(window.get("floating")) == value else "differs"
+        elif key == "fullscreen":
+            state[key] = "matches" if bool(window.get("fullscreen")) == value else "differs"
+        elif key == "pin":
+            state[key] = "matches" if bool(window.get("pinned")) == value else "differs"
+    return state
+
+
+def _ordered_lua_rules(home, omarchy_root):
+    """Expand require() in execution order so tag-based rules stay truthful."""
+    root = home / ".config" / "hypr" / "hyprland.lua"
+    visited = set()
+
+    def record(path, call, line):
+        arguments = _split_top_level(call)
+        if len(arguments) != 2:
+            return None
+        first, second = arguments
+        match = {"class": _lua_value(first)} if first.strip().startswith(("\"", "'")) else _lua_table(first)
+        effects = _normalize_effects(_lua_table(second))
+        if not match or not effects:
+            return None
+        return {"path": str(path), "line": line, "rule": "o.window(" + call + ")", "match": match, "effects": effects, "format": "lua"}
+
+    def visit(path):
+        path = path.resolve()
+        if path in visited or not path.exists():
+            return []
+        visited.add(path)
+        text = path.read_text(encoding="utf-8", errors="replace")
+        events = []
+        for call, line, position in _lua_calls(text):
+            events.append((position, "rule", (call, line)))
+        for match in re.finditer(r"(?:require|require_optional\.module)\(\s*[\"']([^\"']+)[\"']\s*\)", text):
+            events.append((match.start(), "module", match.group(1)))
+        for match in re.finditer(r"require_all\.files\(", text):
+            if "default/hypr/apps" in text:
+                events.append((match.start(), "all-default-apps", None))
+        rules = []
+        for _, kind, data in sorted(events, key=lambda event: event[0]):
+            if kind == "rule":
+                item = record(path, *data)
+                if item:
+                    rules.append(item)
+            elif kind == "module":
+                candidate = _resolve_lua_module(data, home, omarchy_root)
+                if candidate:
+                    rules.extend(visit(candidate))
+            else:
+                apps = omarchy_root / "default" / "hypr" / "apps"
+                for candidate in sorted(apps.glob("*.lua")):
+                    rules.extend(visit(candidate))
+        return rules
+
+    return visit(root)
+
+
+def _conf_rules(path):
+    for number, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+        found = re.match(r"^\s*windowrule(?:v2)?\s*=\s*(.+)$", line)
+        if not found:
+            continue
+        parts = _split_top_level(found.group(1))
+        if not parts:
+            continue
+        effect = parts[0].split()
+        if not effect:
+            continue
+        key, value = effect[0], " ".join(effect[1:])
+        match = {}
+        for item in parts[1:]:
+            matched = re.match(r"match:(class|title)\s+(.+)$", item)
+            if matched:
+                match[matched.group(1)] = matched.group(2)
+        if match:
+            yield {"path": str(path), "line": number, "rule": line.strip(), "match": match, "effects": _normalize_effects({key: value}), "format": "conf"}
+
+
+def explain_window_rules(window, home=None, omarchy_root=None):
+    """Find loaded-looking static rules that match a selected live window."""
+    home = Path(home or Path.home())
+    omarchy_root = Path(omarchy_root or os.getenv("OMARCHY_PATH", "/usr/share/omarchy"))
+    candidates = _ordered_lua_rules(home, omarchy_root)
+    for path in _discover_conf_files(home):
+        candidates.extend(_conf_rules(path))
+
+    tags, matches = set(), []
+    for candidate in candidates:
+        if not _matches_window(candidate["match"], window, tags):
+            continue
+        effects = candidate["effects"]
+        tag = effects.get("tag")
+        if isinstance(tag, str):
+            if tag.startswith("-"):
+                tags.discard(tag[1:])
+            else:
+                tags.add(tag.lstrip("+"))
+        candidate["state"] = _effect_state(effects, window)
+        matches.append(candidate)
+
+    placement = [match for match in matches if PLACEMENT_EFFECTS.intersection(match["effects"])]
+    if placement:
+        first = placement[0]
+        facts = []
+        if "workspace" in first["effects"]:
+            facts.append("workspace " + first["effects"]["workspace"])
+        if "monitor" in first["effects"]:
+            facts.append("monitor " + first["effects"]["monitor"])
+        if "float" in first["effects"]:
+            facts.append("flotante " + ("sí" if first["effects"]["float"] else "no"))
+        return {"verdict": "placement-rule", "message": "Hay una regla coincidente que puede explicar " + ", ".join(facts) + ".", "matches": matches}
+    if matches:
+        return {"verdict": "style-rule", "message": "Hay reglas coincidentes, pero solo cambian estilo; no el workspace ni el monitor.", "matches": matches}
+    return {"verdict": "no-match", "message": "No encontré una regla estática que coincida. La posición viene del layout, la aplicación o automatización externa.", "matches": []}
 
 
 def action_command(action, window, current_workspace=None):
@@ -127,31 +414,34 @@ def remember_window(window, home=None, reload_hyprland=True):
     """Persist a scoped rule file, keeping an exact one-step undo snapshot."""
     home = Path(home or Path.home())
     hypr_dir = home / ".config" / "hypr"
-    apps_file = hypr_dir / "apps.conf"
-    rules_file = hypr_dir / "apps" / "omawhy.conf"
+    lua_config = hypr_dir / "hyprland.lua"
+    using_lua = lua_config.exists()
+    config_file = lua_config if using_lua else hypr_dir / "apps.conf"
+    rules_file = hypr_dir / "omawhy.lua" if using_lua else hypr_dir / "apps" / "omawhy.conf"
     state_dir = home / ".local" / "state" / "omawhy"
     state_file = state_dir / "last-change.json"
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     backup_dir = state_dir / "backups" / stamp
     backup_dir.mkdir(parents=True, exist_ok=True)
 
-    snapshots = [_snapshot(apps_file), _snapshot(rules_file)]
+    snapshots = [_snapshot(config_file), _snapshot(rules_file)]
     for snapshot in snapshots:
         if snapshot["exists"]:
             source = Path(snapshot["path"])
             shutil.copy2(source, backup_dir / source.name)
     _atomic_write(state_file, json.dumps({"snapshots": snapshots}, ensure_ascii=False))
 
-    source_line = "source = " + str(rules_file)
-    current_apps = snapshots[0]["text"]
-    if source_line not in current_apps.splitlines():
-        _atomic_write(apps_file, current_apps.rstrip("\n") + "\n" + source_line + "\n")
+    source_line = 'require("hypr.omawhy")' if using_lua else "source = " + str(rules_file)
+    current_config = snapshots[0]["text"]
+    if source_line not in current_config.splitlines():
+        _atomic_write(config_file, current_config.rstrip("\n") + "\n" + source_line + "\n")
 
     token = hashlib.sha256(str(window.get("identifier") or "").encode("utf-8")).hexdigest()[:12]
-    start = "# >>> OmaWhy " + token
-    end = "# <<< OmaWhy " + token
+    start = ("-- >>> OmaWhy " if using_lua else "# >>> OmaWhy ") + token
+    end = ("-- <<< OmaWhy " if using_lua else "# <<< OmaWhy ") + token
     current_rules = snapshots[1]["text"]
-    section = start + "\n" + "\n".join(build_remembered_rules(window)) + "\n" + end + "\n"
+    rule_lines = [build_remembered_lua_rule(window)] if using_lua else build_remembered_rules(window)
+    section = start + "\n" + "\n".join(rule_lines) + "\n" + end + "\n"
     existing = re.compile(re.escape(start) + r"\n.*?" + re.escape(end) + r"\n?", re.DOTALL)
     _atomic_write(rules_file, existing.sub(section, current_rules) if existing.search(current_rules) else current_rules.rstrip("\n") + ("\n\n" if current_rules else "") + section)
 
@@ -219,6 +509,10 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description="OmaWhy helper")
     subcommands = parser.add_subparsers(dest="command", required=True)
     subcommands.add_parser("inspect-at-cursor")
+    explain_parser = subcommands.add_parser("explain")
+    explain_parser.add_argument("--window-json", required=True)
+    open_rule_parser = subcommands.add_parser("open-rule")
+    open_rule_parser.add_argument("--path", required=True)
     window_parser = subcommands.add_parser("action")
     window_parser.add_argument("action")
     window_parser.add_argument("--window-json", required=True)
@@ -234,6 +528,15 @@ def main(argv=None):
             if window is None:
                 return _emit({"ok": False, "error": "No hay una ventana bajo el cursor."}, 1)
             return _emit({"ok": True, "window": window})
+        if args.command == "explain":
+            return _emit({"ok": True, "explanation": explain_window_rules(json.loads(args.window_json))})
+        if args.command == "open-rule":
+            path = Path(args.path).expanduser().resolve()
+            allowed = [Path.home() / ".config" / "hypr", Path(os.getenv("OMARCHY_PATH", "/usr/share/omarchy")) / "default" / "hypr"]
+            if not any(path.is_relative_to(root.resolve()) for root in allowed) or not path.is_file():
+                raise ValueError("La regla no está en una ruta de configuración permitida.")
+            subprocess.Popen(["xdg-open", str(path)])
+            return _emit({"ok": True, "message": "Archivo de regla abierto."})
         if args.command == "action":
             window = json.loads(args.window_json)
             current_workspace = _hypr_json("activeworkspace").get("id") if args.action == "move-current" else None
@@ -252,7 +555,8 @@ def main(argv=None):
                 else {"ok": False, "error": "No hay un cambio de OmaWhy para deshacer."},
                 0 if undone else 1,
             )
-        rules_file = Path.home() / ".config" / "hypr" / "apps" / "omawhy.conf"
+        hypr_dir = Path.home() / ".config" / "hypr"
+        rules_file = hypr_dir / "omawhy.lua" if (hypr_dir / "hyprland.lua").exists() else hypr_dir / "apps" / "omawhy.conf"
         subprocess.Popen(["xdg-open", str(rules_file)])
         return _emit({"ok": True, "message": "Archivo de reglas abierto."})
     except (ValueError, RuntimeError, json.JSONDecodeError) as error:

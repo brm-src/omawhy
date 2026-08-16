@@ -2,21 +2,33 @@
 set -euo pipefail
 
 CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
-BINDINGS_FILE="$CONFIG_HOME/hypr/bindings.conf"
-BEGIN="# OmaWhy: begin"
-END="# OmaWhy: end"
+if [[ -f "$CONFIG_HOME/hypr/hyprland.lua" ]]; then
+  BINDINGS_FILE="$CONFIG_HOME/hypr/bindings.lua"
+  FORMAT="lua"
+  BEGIN="-- OmaWhy: begin"
+  END="-- OmaWhy: end"
+else
+  BINDINGS_FILE="$CONFIG_HOME/hypr/bindings.conf"
+  FORMAT="conf"
+  BEGIN="# OmaWhy: begin"
+  END="# OmaWhy: end"
+fi
 
-python3 - "$BINDINGS_FILE" "$BEGIN" "$END" "${1:-}" <<'PY'
+python3 - "$BINDINGS_FILE" "$BEGIN" "$END" "$FORMAT" "${1:-}" <<'PY'
 import re
 import sys
 from pathlib import Path
 
 path = Path(sys.argv[1])
-begin, end, mode = sys.argv[2:]
+begin, end, file_format, mode = sys.argv[2:]
 text = path.read_text(encoding="utf-8") if path.exists() else ""
+if file_format == "lua":
+    binding = 'o.bind("SUPER + SHIFT + I", "OmaWhy", "omarchy-shell shell toggle io.github.brm-src.omawhy \'{}\'")'
+else:
+    binding = "bindd = SUPER SHIFT, I, OmaWhy, exec, omarchy-shell shell toggle io.github.brm-src.omawhy '{}'"
 block = "\n".join([
     begin,
-    "bindd = SUPER SHIFT, I, OmaWhy, exec, omarchy-shell shell toggle io.github.brm-src.omawhy '{}'",
+    binding,
     end,
     "",
 ])

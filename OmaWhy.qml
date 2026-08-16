@@ -11,6 +11,7 @@ Item {
   property bool opened: false
   property string phase: "pick" // pick, inspect, confirm
   property var selected: ({})
+  property var explanation: ({})
   property string status: ""
   property var processCallback: null
 
@@ -18,6 +19,7 @@ Item {
     root.opened = true
     root.phase = "pick"
     root.selected = ({})
+    root.explanation = ({})
     root.status = "Haz clic sobre una ventana para inspeccionarla. Esc cancela."
   }
 
@@ -25,6 +27,7 @@ Item {
     root.opened = false
     root.phase = "pick"
     root.selected = ({})
+    root.explanation = ({})
     root.status = ""
   }
 
@@ -52,6 +55,37 @@ Item {
     root.processCallback = null
   }
 
+  function loadExplanation() {
+    root.status = "Buscando reglas que coincidan…"
+    root.runHelper(["explain", "--window-json", JSON.stringify(root.selected)], function(payload) {
+      if (!payload.ok) {
+        root.status = payload.error || "No se pudieron analizar las reglas."
+        return
+      }
+      root.explanation = payload.explanation || ({})
+      root.status = root.explanation.message || "Análisis listo."
+    })
+  }
+
+  function effectText(match) {
+    var effects = match.effects || ({})
+    var items = []
+    if (effects.workspace) items.push("workspace " + effects.workspace)
+    if (effects.monitor) items.push("monitor " + effects.monitor)
+    if (effects.float !== undefined) items.push("flotante " + (effects.float ? "sí" : "no"))
+    if (effects.fullscreen !== undefined) items.push("fullscreen " + (effects.fullscreen ? "sí" : "no"))
+    if (effects.pin !== undefined) items.push("fijada " + (effects.pin ? "sí" : "no"))
+    if (effects.opacity) items.push("opacidad " + effects.opacity)
+    if (effects.tag) items.push("tag " + effects.tag)
+    return items.length ? items.join(" · ") : "regla coincidente"
+  }
+
+  function openMatchedRule(match) {
+    root.runHelper(["open-rule", "--path", String(match.path || "")], function(payload) {
+      root.status = payload.message || payload.error || "Listo."
+    })
+  }
+
   function inspectAtCursor() {
     root.status = "Leyendo la ventana…"
     root.runHelper(["inspect-at-cursor"], function(payload) {
@@ -62,6 +96,7 @@ Item {
       root.selected = payload.window
       root.phase = "inspect"
       root.status = "Ventana inspeccionada."
+      Qt.callLater(root.loadExplanation)
     })
   }
 
@@ -239,10 +274,99 @@ Item {
               }
             }
 
+            Rectangle {
+              visible: root.phase === "inspect" && root.explanation.verdict !== undefined
+              width: parent.width
+              height: whyColumn.implicitHeight + 22
+              radius: 9
+              color: root.explanation.verdict === "placement-rule"
+                ? Util.alpha(Color.accent, 0.18)
+                : Util.alpha(Color.foreground, 0.08)
+              border.width: 1
+              border.color: root.explanation.verdict === "placement-rule"
+                ? Util.alpha(Color.accent, 0.75)
+                : Util.alpha(Color.foreground, 0.18)
+
+              Column {
+                id: whyColumn
+                anchors.fill: parent
+                anchors.margins: 11
+                spacing: 7
+                Text {
+                  text: root.explanation.verdict === "placement-rule"
+                    ? "ESTO PUEDE EXPLICAR DÓNDE QUEDÓ"
+                    : root.explanation.verdict === "style-rule"
+                      ? "HAY REGLAS, PERO NO MUEVEN LA VENTANA"
+                      : "NO HAY REGLA ESTÁTICA COINCIDENTE"
+                  color: root.explanation.verdict === "placement-rule" ? Color.accent : Color.foreground
+                  font.family: Style.font.family
+                  font.pixelSize: 11
+                  font.bold: true
+                  font.letterSpacing: 1
+                }
+                Text {
+                  width: parent.width
+                  text: root.explanation.message || ""
+                  color: Color.foreground
+                  font.family: Style.font.family
+                  font.pixelSize: 12
+                  wrapMode: Text.Wrap
+                  textFormat: Text.PlainText
+                }
+              }
+            }
+
+            Repeater {
+              visible: root.phase === "inspect"
+              model: root.explanation.matches || []
+              delegate: Rectangle {
+                width: content.width
+                height: sourceColumn.implicitHeight + 18
+                radius: 8
+                color: Util.alpha(Color.foreground, 0.06)
+                Column {
+                  id: sourceColumn
+                  anchors.fill: parent
+                  anchors.margins: 9
+                  spacing: 4
+                  Text {
+                    width: parent.width
+                    text: String(modelData.path || "").split("/").pop() + ":" + modelData.line + " · " + root.effectText(modelData)
+                    color: Color.accent
+                    font.family: Style.font.family
+                    font.pixelSize: 11
+                    elide: Text.ElideRight
+                  }
+                  Text {
+                    width: parent.width
+                    text: modelData.rule || ""
+                    color: Util.alpha(Color.foreground, 0.70)
+                    font.family: Style.font.family
+                    font.pixelSize: 10
+                    elide: Text.ElideRight
+                  }
+                  Text {
+                    text: "Abrir archivo"
+                    color: Color.foreground
+                    font.family: Style.font.family
+                    font.pixelSize: 11
+                    font.underline: sourceMouse.containsMouse
+                    MouseArea {
+                      id: sourceMouse
+                      anchors.fill: parent
+                      hoverEnabled: true
+                      cursorShape: Qt.PointingHandCursor
+                      onClicked: root.openMatchedRule(modelData)
+                    }
+                  }
+                }
+              }
+            }
+
             Text {
               visible: root.phase === "confirm"
               width: parent.width
-              text: "Se escribirá una regla limitada a esta aplicación en ~/.config/hypr/apps/omawhy.conf. OmaWhy crea un backup y puedes deshacer el último cambio."
+              text: "Se escribirá una regla limitada a esta aplicación en la configuración activa de Hyprland. OmaWhy crea un backup y puedes deshacer el último cambio."
               wrapMode: Text.Wrap
               textFormat: Text.PlainText
               color: Util.alpha(Color.foreground, 0.72)

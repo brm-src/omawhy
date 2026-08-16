@@ -7,6 +7,7 @@ from pathlib import Path
 from omawhy import (
     action_command,
     build_remembered_rules,
+    explain_window_rules,
     inspect_window_at_cursor,
     normalize_window,
     remember_window,
@@ -122,6 +123,17 @@ class NormalizeWindowTests(unittest.TestCase):
             self.assertEqual(apps_file.read_text(encoding="utf-8"), "# Existing user rules\n")
             self.assertFalse(rule_file.exists())
 
+            hyprland_lua = home / ".config" / "hypr" / "hyprland.lua"
+            hyprland_lua.write_text('require("default.hypr.omarchy")\n', encoding="utf-8")
+            lua_result = remember_window(window, home=home, reload_hyprland=False)
+            lua_rules = home / ".config" / "hypr" / "omawhy.lua"
+            self.assertEqual(lua_result["rules_file"], lua_rules)
+            self.assertIn('require("hypr.omawhy")', hyprland_lua.read_text(encoding="utf-8"))
+            self.assertIn('o.window("^firefox$"', lua_rules.read_text(encoding="utf-8"))
+            self.assertTrue(undo_last_change(home=home, reload_hyprland=False))
+            self.assertEqual(hyprland_lua.read_text(encoding="utf-8"), 'require("default.hypr.omarchy")\n')
+            self.assertFalse(lua_rules.exists())
+
     def test_inspection_resolves_the_human_monitor_name(self):
         selected = inspect_window_at_cursor(
             [
@@ -176,6 +188,87 @@ class NormalizeWindowTests(unittest.TestCase):
             removed = subprocess.run(["bash", "setup.sh", "--remove"], cwd=Path(__file__).parents[1], env=env, text=True, capture_output=True)
             self.assertEqual(removed.returncode, 0, removed.stderr)
             self.assertEqual(bindings.read_text(encoding="utf-8"), "# My own binding\n")
+
+            (config / "hyprland.lua").write_text('require("hypr.bindings")\n', encoding="utf-8")
+            lua_bindings = config / "bindings.lua"
+            lua_bindings.write_text("-- My own Lua binding\n", encoding="utf-8")
+            installed_lua = subprocess.run(["bash", "setup.sh"], cwd=Path(__file__).parents[1], env=env, text=True, capture_output=True)
+            self.assertEqual(installed_lua.returncode, 0, installed_lua.stderr)
+            self.assertIn('o.bind("SUPER + SHIFT + I", "OmaWhy"', lua_bindings.read_text(encoding="utf-8"))
+
+            removed_lua = subprocess.run(["bash", "setup.sh", "--remove"], cwd=Path(__file__).parents[1], env=env, text=True, capture_output=True)
+            self.assertEqual(removed_lua.returncode, 0, removed_lua.stderr)
+            self.assertEqual(lua_bindings.read_text(encoding="utf-8"), "-- My own Lua binding\n")
+
+    def test_explains_a_matching_omarchy_lua_placement_rule_with_source_and_line(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            hypr = home / ".config" / "hypr"
+            hypr.mkdir(parents=True)
+            (hypr / "hyprland.lua").write_text('require("hypr.rules")\n', encoding="utf-8")
+            (hypr / "rules.lua").write_text(
+                'o.window("firefox", { workspace = "3", float = true })\n'
+                'o.window("firefox", { opacity = "1.0 0.9" })\n',
+                encoding="utf-8",
+            )
+
+            explanation = explain_window_rules(
+                {"identifier": "firefox", "workspace": 3, "floating": True, "monitor": "HDMI-A-1"},
+                home=home,
+                omarchy_root=home / "missing-omarchy",
+            )
+
+            self.assertEqual(explanation["verdict"], "placement-rule")
+            self.assertEqual(len(explanation["matches"]), 2)
+            placement = explanation["matches"][0]
+            self.assertEqual(placement["path"], str(hypr / "rules.lua"))
+            self.assertEqual(placement["line"], 1)
+            self.assertEqual(placement["effects"], {"workspace": "3", "float": True})
+            self.assertEqual(placement["state"], {"workspace": "matches", "float": "matches"})
+            self.assertIn("workspace 3", explanation["message"])
+
+    def test_explains_matching_legacy_conf_rules_from_sourced_files(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            hypr = home / ".config" / "hypr"
+            rules = hypr / "apps" / "browser.conf"
+            rules.parent.mkdir(parents=True)
+            (hypr / "hyprland.conf").write_text("source = ~/.config/hypr/apps.conf\n", encoding="utf-8")
+            (hypr / "apps.conf").write_text("source = " + str(rules) + "\n", encoding="utf-8")
+            rules.write_text("windowrule = float on, match:class ^(firefox)$\n", encoding="utf-8")
+
+            explanation = explain_window_rules(
+                {"identifier": "firefox", "workspace": 1, "floating": True, "monitor": "HDMI-A-1"},
+                home=home,
+                omarchy_root=home / "missing-omarchy",
+            )
+
+            self.assertEqual(explanation["verdict"], "placement-rule")
+            self.assertEqual(explanation["matches"][0]["format"], "conf")
+            self.assertEqual(explanation["matches"][0]["effects"], {"float": True})
+            self.assertEqual(explanation["matches"][0]["state"], {"float": "matches"})
+
+    def test_follows_lua_require_order_before_claiming_a_tag_rule_applies(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            hypr = home / ".config" / "hypr"
+            hypr.mkdir(parents=True)
+            (hypr / "hyprland.lua").write_text(
+                'o.window("firefox", { tag = "+chosen" })\n'
+                'require("hypr.rules")\n'
+                'o.window({ tag = "chosen" }, { workspace = "7" })\n',
+                encoding="utf-8",
+            )
+            (hypr / "rules.lua").write_text('o.window({ tag = "chosen" }, { tag = "-chosen" })\n', encoding="utf-8")
+
+            explanation = explain_window_rules(
+                {"identifier": "firefox", "workspace": 1, "floating": False, "monitor": "HDMI-A-1"},
+                home=home,
+                omarchy_root=home / "missing-omarchy",
+            )
+
+            self.assertEqual(explanation["verdict"], "style-rule")
+            self.assertFalse(any("workspace" in match["effects"] for match in explanation["matches"]))
 
 
 if __name__ == "__main__":

@@ -13,7 +13,7 @@
   <circle cx="120" cy="920" r="280" fill="#7f5af0" opacity=".12" filter="url(#soft)"/>
 
   <text x="78" y="92" fill="#f5f2ff" font-family="monospace" font-weight="700" font-size="31" letter-spacing="5">OMAWHY</text>
-  <text x="78" y="130" fill="#b9b2c8" font-family="sans-serif" font-size="20">Entiende las reglas de Hyprland mirando la ventana.</text>
+  <text x="78" y="130" fill="#b9b2c8" font-family="sans-serif" font-size="20">Localiza la regla que ubicó una ventana — o descarta que exista.</text>
   <text x="1320" y="95" fill="#e0228f" font-family="monospace" font-size="17" font-weight="700">SUPER + SHIFT + I</text>
 
   <!-- background desktop and selected app -->
@@ -53,24 +53,26 @@
   <line x1="900" x2="1460" y1="308" y2="308" stroke="#84778f" stroke-opacity=".35"/>
 
   <g font-family="monospace" font-size="16">
-    <g fill="#ada5b9"><text x="900" y="350">App ID</text><text x="900" y="387">Título</text><text x="900" y="424">Workspace</text><text x="900" y="461">Monitor</text><text x="900" y="498">Flotante</text><text x="900" y="535">Pantalla completa</text><text x="900" y="572">Fijada</text><text x="900" y="609">PID</text><text x="900" y="646">Dirección</text></g>
-    <g fill="#f5f0fa"><text x="1080" y="350">firefox</text><text x="1080" y="387">YouTube</text><text x="1080" y="424">3</text><text x="1080" y="461">HDMI-A-1</text><text x="1080" y="498">no</text><text x="1080" y="535">no</text><text x="1080" y="572">no</text><text x="1080" y="609">8421</text><text x="1080" y="646">0x1234</text></g>
+    <g fill="#ada5b9"><text x="900" y="350">App ID</text><text x="900" y="387">Workspace</text><text x="900" y="424">Monitor</text><text x="900" y="461">Flotante</text></g>
+    <g fill="#f5f0fa"><text x="1080" y="350">firefox</text><text x="1080" y="387">3</text><text x="1080" y="424">HDMI-A-1</text><text x="1080" y="461">no</text></g>
   </g>
 
-  <!-- action chips matching plugin action set -->
+  <!-- the useful answer: source, effect, and confidence -->
+  <rect x="900" y="490" width="560" height="128" rx="10" fill="#4a1f40" fill-opacity=".65" stroke="#e0228f" stroke-opacity=".9"/>
+  <text x="918" y="519" fill="#ff64b7" font-family="monospace" font-size="14" font-weight="700" letter-spacing="1">ESTO PUEDE EXPLICAR DÓNDE QUEDÓ</text>
+  <text x="918" y="548" fill="#f8f3fb" font-family="sans-serif" font-size="17">La regla coincide con Firefox y lo envía al workspace 3.</text>
+  <text x="918" y="579" fill="#c9bdd0" font-family="monospace" font-size="14">omawhy.lua:4 · workspace 3 · flotante no</text>
+  <text x="918" y="605" fill="#ffb4de" font-family="sans-serif" font-size="14" font-weight="700">Abrir archivo</text>
+
+  <!-- compact actions, secondary to the explanation -->
   <g font-family="sans-serif" font-size="14" text-anchor="middle">
-    <rect x="900" y="684" width="114" height="34" rx="8" fill="#3a3444"/><text x="957" y="706" fill="#fff">Copiar App ID</text>
-    <rect x="1024" y="684" width="103" height="34" rx="8" fill="#3a3444"/><text x="1075" y="706" fill="#fff">Copiar regla</text>
-    <rect x="1137" y="684" width="104" height="34" rx="8" fill="#3a3444"/><text x="1189" y="706" fill="#fff">Mover aquí</text>
-    <rect x="1251" y="684" width="89" height="34" rx="8" fill="#3a3444"/><text x="1295" y="706" fill="#fff">Centrar</text>
-    <rect x="1350" y="684" width="110" height="34" rx="8" fill="#3a3444"/><text x="1405" y="706" fill="#fff">Flotante</text>
-    <rect x="900" y="730" width="103" height="34" rx="8" fill="#3a3444"/><text x="951" y="752" fill="#fff">Fullscreen</text>
-    <rect x="1013" y="730" width="82" height="34" rx="8" fill="#3a3444"/><text x="1054" y="752" fill="#fff">Fijar</text>
-    <rect x="1105" y="730" width="109" height="34" rx="8" fill="#3a3444"/><text x="1160" y="752" fill="#fff">Abrir reglas</text>
-    <rect x="1224" y="730" width="93" height="34" rx="8" fill="#3a3444"/><text x="1270" y="752" fill="#fff">Deshacer</text>
-    <rect x="1327" y="730" width="133" height="34" rx="8" fill="#e0228f"/><text x="1394" y="752" fill="#1b1019" font-weight="700">Recordar</text>
+    <rect x="900" y="649" width="116" height="34" rx="8" fill="#3a3444"/><text x="958" y="671" fill="#fff">Mover aquí</text>
+    <rect x="1026" y="649" width="104" height="34" rx="8" fill="#3a3444"/><text x="1078" y="671" fill="#fff">Centrar</text>
+    <rect x="1140" y="649" width="110" height="34" rx="8" fill="#3a3444"/><text x="1195" y="671" fill="#fff">Flotante</text>
+    <rect x="1260" y="649" width="92" height="34" rx="8" fill="#3a3444"/><text x="1306" y="671" fill="#fff">Deshacer</text>
+    <rect x="1362" y="649" width="98" height="34" rx="8" fill="#e0228f"/><text x="1411" y="671" fill="#1b1019" font-weight="700">Recordar</text>
   </g>
-  <text x="900" y="808" fill="#b7aebe" font-family="sans-serif" font-size="15">Ventana inspeccionada. La regla se guarda solo al confirmar.</text>
+  <text x="900" y="724" fill="#b7aebe" font-family="sans-serif" font-size="15">Si no hubiera una regla, OmaWhy te diría que revises el layout o la app.</text>
 
   <text x="78" y="933" fill="#c3bacb" font-family="sans-serif" font-size="18">Inspector de ventanas para Omarchy · sin cuentas, APIs ni servicios externos</text>
   <text x="78" y="966" fill="#8f849b" font-family="monospace" font-size="15">app_id / class · monitor · workspace · regla reversible</text>

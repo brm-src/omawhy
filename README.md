@@ -1,10 +1,16 @@
 # OmaWhy
 
-**Make Hyprland window rules visible, then fix them without guessing.**
+**Find the rule that put a Hyprland window there — or prove that no rule did.**
 
-OmaWhy is an Omarchy Quattro service for anyone who has asked: *why did this window open here?*
+OmaWhy is an Omarchy Quattro service for the moment you ask: *why did this window open here?*
 
-Press `Super + Shift + I`, click a window, and get its real Hyprland identity and state. From the same overlay, copy a rule, correct the window, or save its current placement as a reversible rule.
+Press `Super + Shift + I`, click a window, and OmaWhy reads the rules loaded by your actual Hyprland setup: modern Omarchy Lua rules (`o.window(...)`) and classic `windowrule` files. It then tells you one of three useful things:
+
+- **A placement rule matches**: it shows the exact file, line, effects (workspace, monitor, floating, etc.) and whether the live state agrees.
+- **Only style rules match**: opacity or tags affect the app, but they do **not** explain its workspace or monitor.
+- **No static rule matches**: the position is coming from the layout, the app itself, or another automation — not a hidden line in your config.
+
+Each match has an **Abrir archivo** action. From the same overlay, you can also correct the selected window or save its current placement as a reversible rule.
 
 ![Illustrated OmaWhy UI preview](preview.png)
 
@@ -17,7 +23,7 @@ omarchy plugin add https://github.com/brm-src/omawhy.git --enable --yes
 ~/.config/omarchy/plugins/io.github.brm-src.omawhy/setup.sh
 ```
 
-The second command adds exactly one marked binding to `~/.config/hypr/bindings.conf` and reloads Hyprland:
+The second command adds exactly one marked binding and reloads Hyprland. It uses `~/.config/hypr/bindings.lua` on current Omarchy and falls back to `bindings.conf` on classic configurations:
 
 ```text
 Super + Shift + I
@@ -29,8 +35,9 @@ It does not install packages, elevate permissions, access the network, or run au
 
 1. Press `Super + Shift + I`.
 2. Click the window you want to understand.
-3. OmaWhy shows the actual identifier, title, workspace, monitor, floating/fullscreen/pinned state, PID, and Hyprland address.
-4. Use a small action or choose **Recordar**.
+3. Read the answer at the top: **a placement rule**, **style-only rules**, or **no static rule**.
+4. If a rule matches, use **Abrir archivo** to go straight to its source and line reference. If none matches, stop hunting through Hyprland rules: check the app or layout instead.
+5. Only then use a small action or choose **Recordar** to create a reversible placement rule.
 
 ### Actions
 
@@ -45,13 +52,14 @@ It does not install packages, elevate permissions, access the network, or run au
 
 Before writing anything, OmaWhy shows the selected window's workspace, monitor, floating state, and other live facts.
 
-On confirmation it writes a dedicated file:
+On confirmation it writes a dedicated rule file and adds one marked include to your active configuration:
 
 ```text
-~/.config/hypr/apps/omawhy.conf
+Current Omarchy: ~/.config/hypr/omawhy.lua + require("hypr.omawhy") in hyprland.lua
+Classic Hyprland: ~/.config/hypr/apps/omawhy.conf + source = … in apps.conf
 ```
 
-and adds one `source = …` line to `~/.config/hypr/apps.conf` if it is missing. It creates a timestamped backup in:
+It creates a timestamped backup in:
 
 ```text
 ~/.local/state/omawhy/backups/
@@ -59,7 +67,7 @@ and adds one `source = …` line to `~/.config/hypr/apps.conf` if it is missing.
 
 **Undo** restores both files exactly to their state before the last Remember action.
 
-Rules use an anchored `match:class` identifier. In Hyprland this field is a Wayland `app_id` for native Wayland clients and an X11 class for XWayland clients. A remembered rule therefore applies to future windows with that same application identifier—not to an unverified title match. Edit `omawhy.conf` if you want a narrower rule.
+Rules use an anchored app identifier: `o.window("^app_id$", …)` on current Omarchy and anchored `match:class` on classic Hyprland. The identifier is a Wayland `app_id` for native clients and an X11 class for XWayland clients. A remembered rule therefore applies to future windows with that same application identifier—not to an unverified title match. Edit the OmaWhy rule file if you want a narrower rule.
 
 ## Remove
 
