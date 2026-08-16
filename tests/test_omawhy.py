@@ -7,6 +7,8 @@ from pathlib import Path
 from omawhy import (
     action_command,
     build_remembered_rules,
+    desktop_status,
+    diagnose_shortcut,
     explain_window_rules,
     inspect_window_at_cursor,
     normalize_window,
@@ -269,6 +271,46 @@ class NormalizeWindowTests(unittest.TestCase):
 
             self.assertEqual(explanation["verdict"], "style-rule")
             self.assertFalse(any("workspace" in match["effects"] for match in explanation["matches"]))
+
+    def test_finds_an_active_lua_shortcut_and_its_source(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            bindings = home / ".config" / "hypr" / "bindings.lua"
+            bindings.parent.mkdir(parents=True)
+            bindings.write_text('o.bind("SUPER + SHIFT + I", "OmaWhy", "omarchy-shell shell toggle io.github.brm-src.omawhy \'{}\'")\n', encoding="utf-8")
+
+            diagnosis = diagnose_shortcut("Super Shift I", home=home, omarchy_root=home / "missing-omarchy")
+
+            self.assertEqual(diagnosis["verdict"], "bound")
+            self.assertEqual(diagnosis["binding"]["label"], "OmaWhy")
+            self.assertEqual(diagnosis["binding"]["path"], str(bindings))
+            self.assertEqual(diagnosis["binding"]["line"], 1)
+
+    def test_desktop_status_reports_active_config_shell_and_omawhy_binding(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            hypr = home / ".config" / "hypr"
+            hypr.mkdir(parents=True)
+            (hypr / "hyprland.lua").write_text('require("hypr.bindings")\n', encoding="utf-8")
+            (hypr / "bindings.lua").write_text('o.bind("SUPER + SHIFT + I", "OmaWhy", "omarchy-shell shell toggle io.github.brm-src.omawhy \'{}\'")\n', encoding="utf-8")
+
+            status = desktop_status(home=home, omarchy_root=home / "missing-omarchy", check_command=lambda command: True)
+
+            self.assertEqual(status["config"], "lua")
+            self.assertEqual([item["state"] for item in status["checks"]], ["ok", "ok", "ok"])
+            self.assertIn("listo", status["message"])
+
+    def test_reports_a_shortcut_disabled_by_user_configuration(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            bindings = home / ".config" / "hypr" / "bindings.lua"
+            bindings.parent.mkdir(parents=True)
+            bindings.write_text('hl.unbind("SUPER + SHIFT + I")\n', encoding="utf-8")
+
+            diagnosis = diagnose_shortcut("Super Shift I", home=home, omarchy_root=home / "missing-omarchy")
+
+            self.assertEqual(diagnosis["verdict"], "disabled")
+            self.assertEqual(diagnosis["events"][0]["line"], 1)
 
 
 if __name__ == "__main__":

@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "id": "io.github.brm-src.omawhy",
   "name": "OmaWhy",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "author": "brm-src",
   "license": "MIT",
-  "description": "Inspect any Hyprland window, explain its placement, and save reversible rules.",
+  "description": "Ask why Omarchy did that: diagnose windows, shortcuts, and desktop readiness.",
   "kinds": ["service"],
   "entryPoints": {
     "service": "OmaWhy.qml"

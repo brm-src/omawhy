@@ -85,6 +85,70 @@ def window_at_cursor(clients, x, y):
     return None
 
 
+def _normalize_shortcut(keys):
+    return " + ".join(piece for piece in re.split(r"\s*(?:\+|,)\s*|\s+", str(keys).upper().strip()) if piece)
+
+
+def _shortcut_events(path):
+    text = path.read_text(encoding="utf-8", errors="replace")
+    events = []
+    lua_bind = re.compile(r"o\.bind\(\s*[\"'](?P<keys>[^\"']+)[\"']\s*,\s*(?P<label>nil|[\"'][^\"']*[\"'])\s*,\s*(?P<command>[\"'][^\"']*[\"']|\{)")
+    for match in lua_bind.finditer(text):
+        label = match.group("label")
+        command = match.group("command")
+        events.append((match.start(), {"action": "bind", "keys": _normalize_shortcut(match.group("keys")), "label": "" if label == "nil" else label[1:-1], "command": "comando compuesto" if command == "{" else command[1:-1], "path": str(path), "line": text.count("\n", 0, match.start()) + 1}))
+    for match in re.finditer(r"hl\.unbind\(\s*[\"']([^\"']+)[\"']\s*\)", text):
+        events.append((match.start(), {"action": "unbind", "keys": _normalize_shortcut(match.group(1)), "path": str(path), "line": text.count("\n", 0, match.start()) + 1}))
+    for number, line in enumerate(text.splitlines(), 1):
+        match = re.match(r"\s*bindd?\s*=\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*(.+)$", line)
+        if match:
+            events.append((number * 1000000, {"action": "bind", "keys": _normalize_shortcut(match.group(1) + " " + match.group(2)), "label": match.group(3).strip(), "command": match.group(5).strip(), "path": str(path), "line": number}))
+    return [event for _, event in sorted(events, key=lambda item: item[0])]
+
+
+def diagnose_shortcut(keys, home=None, omarchy_root=None):
+    """Tell the user whether a Hyprland shortcut is bound, disabled, or absent."""
+    wanted = _normalize_shortcut(keys)
+    home = Path(home or Path.home())
+    omarchy_root = Path(omarchy_root or os.getenv("OMARCHY_PATH", "/usr/share/omarchy"))
+    candidates = [
+        omarchy_root / "default" / "hypr" / "bindings.lua",
+        omarchy_root / "default" / "hypr" / "bindings.conf",
+        home / ".config" / "hypr" / "bindings.lua",
+        home / ".config" / "hypr" / "bindings.conf",
+    ]
+    events = []
+    for path in candidates:
+        if path.exists():
+            events.extend(event for event in _shortcut_events(path) if event["keys"] == wanted)
+    if not events:
+        return {"verdict": "missing", "message": "No encontré un atajo para “" + wanted + "” en la configuración de Omarchy.", "events": []}
+    latest = events[-1]
+    if latest["action"] == "unbind":
+        return {"verdict": "disabled", "message": "“" + wanted + "” está desactivado en " + Path(latest["path"]).name + ", línea " + str(latest["line"]) + ".", "events": events}
+    return {"verdict": "bound", "message": "“" + wanted + "” ejecuta “" + (latest["label"] or latest["command"]) + "”.", "binding": latest, "events": events}
+
+
+def desktop_status(home=None, omarchy_root=None, check_command=None):
+    """Check the minimum pieces needed for Omarchy and OmaWhy to respond."""
+    home = Path(home or Path.home())
+    hypr_dir = home / ".config" / "hypr"
+    config = "lua" if (hypr_dir / "hyprland.lua").exists() else "classic" if (hypr_dir / "hyprland.conf").exists() else "missing"
+    if check_command is None:
+        def runner(command):
+            return subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False).returncode == 0
+    else:
+        runner = check_command
+    shortcut = diagnose_shortcut("SUPER + SHIFT + I", home=home, omarchy_root=omarchy_root)
+    checks = [
+        {"label": "Configuración de Hyprland", "state": "ok" if config != "missing" else "warning", "detail": "Formato Lua" if config == "lua" else "Formato clásico" if config == "classic" else "No encontré hyprland.lua ni hyprland.conf."},
+        {"label": "Hyprland y Quickshell", "state": "ok" if runner(["hyprctl", "-j", "version"]) and runner(["pgrep", "-x", "quickshell"]) else "warning", "detail": "Ambos procesos responden."},
+        {"label": "Atajo de OmaWhy", "state": "ok" if shortcut["verdict"] == "bound" else "warning", "detail": shortcut["message"]},
+    ]
+    ready = all(check["state"] == "ok" for check in checks)
+    return {"config": config, "checks": checks, "message": "El escritorio base está listo." if ready else "Encontré algo que revisar antes de culpar a Omarchy."}
+
+
 PLACEMENT_EFFECTS = {"workspace", "monitor", "float", "fullscreen", "pin", "move", "size"}
 
 
@@ -511,6 +575,9 @@ def main(argv=None):
     subcommands.add_parser("inspect-at-cursor")
     explain_parser = subcommands.add_parser("explain")
     explain_parser.add_argument("--window-json", required=True)
+    shortcut_parser = subcommands.add_parser("shortcut")
+    shortcut_parser.add_argument("--keys", required=True)
+    subcommands.add_parser("desktop-status")
     open_rule_parser = subcommands.add_parser("open-rule")
     open_rule_parser.add_argument("--path", required=True)
     window_parser = subcommands.add_parser("action")
@@ -530,6 +597,10 @@ def main(argv=None):
             return _emit({"ok": True, "window": window})
         if args.command == "explain":
             return _emit({"ok": True, "explanation": explain_window_rules(json.loads(args.window_json))})
+        if args.command == "shortcut":
+            return _emit({"ok": True, "diagnosis": diagnose_shortcut(args.keys)})
+        if args.command == "desktop-status":
+            return _emit({"ok": True, "status": desktop_status()})
         if args.command == "open-rule":
             path = Path(args.path).expanduser().resolve()
             allowed = [Path.home() / ".config" / "hypr", Path(os.getenv("OMARCHY_PATH", "/usr/share/omarchy")) / "default" / "hypr"]

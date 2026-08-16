@@ -13,7 +13,7 @@
   <circle cx="120" cy="920" r="280" fill="#7f5af0" opacity=".12" filter="url(#soft)"/>
 
   <text x="78" y="92" fill="#f5f2ff" font-family="monospace" font-weight="700" font-size="31" letter-spacing="5">OMAWHY</text>
-  <text x="78" y="130" fill="#b9b2c8" font-family="sans-serif" font-size="20">Localiza la regla que ubicó una ventana — o descarta que exista.</text>
+  <text x="78" y="130" fill="#b9b2c8" font-family="sans-serif" font-size="20">Pregunta qué hizo raro Omarchy: ventana, atajo o estado del escritorio.</text>
   <text x="1320" y="95" fill="#e0228f" font-family="monospace" font-size="17" font-weight="700">SUPER + SHIFT + I</text>
 
   <!-- background desktop and selected app -->
@@ -74,6 +74,6 @@
   </g>
   <text x="900" y="724" fill="#b7aebe" font-family="sans-serif" font-size="15">Si no hubiera una regla, OmaWhy te diría que revises el layout o la app.</text>
 
-  <text x="78" y="933" fill="#c3bacb" font-family="sans-serif" font-size="18">Inspector de ventanas para Omarchy · sin cuentas, APIs ni servicios externos</text>
-  <text x="78" y="966" fill="#8f849b" font-family="monospace" font-size="15">app_id / class · monitor · workspace · regla reversible</text>
+  <text x="78" y="933" fill="#c3bacb" font-family="sans-serif" font-size="18">Diagnóstico de Omarchy · ventanas, atajos y estado del escritorio</text>
+  <text x="78" y="966" fill="#8f849b" font-family="monospace" font-size="15">evidencia real · archivo y línea · sin adivinar causas</text>
 </svg>

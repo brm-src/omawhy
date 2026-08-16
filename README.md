@@ -1,10 +1,14 @@
 # OmaWhy
 
-**Find the rule that put a Hyprland window there — or prove that no rule did.**
+**Ask why Omarchy did that — and get an answer backed by its real configuration.**
 
-OmaWhy is an Omarchy Quattro service for the moment you ask: *why did this window open here?*
+OmaWhy is an Omarchy Quattro diagnostic service. Open it and choose a real question:
 
-Press `Super + Shift + I`, click a window, and OmaWhy reads the rules loaded by your actual Hyprland setup: modern Omarchy Lua rules (`o.window(...)`) and classic `windowrule` files. It then tells you one of three useful things:
+- **A window ended up wrong**: find the rule that matches it, or prove no static rule did.
+- **A shortcut does nothing**: search where it is defined, replaced, or explicitly disabled.
+- **Check desktop status**: verify the active Hyprland configuration, Hyprland + Quickshell, and OmaWhy's own shortcut.
+
+For a window, OmaWhy reads modern Omarchy Lua rules (`o.window(...)`) and classic `windowrule` files. It reports one of three useful facts:
 
 - **A placement rule matches**: it shows the exact file, line, effects (workspace, monitor, floating, etc.) and whether the live state agrees.
 - **Only style rules match**: opacity or tags affect the app, but they do **not** explain its workspace or monitor.
@@ -34,10 +38,11 @@ It does not install packages, elevate permissions, access the network, or run au
 ## Use
 
 1. Press `Super + Shift + I`.
-2. Click the window you want to understand.
-3. Read the answer at the top: **a placement rule**, **style-only rules**, or **no static rule**.
-4. If a rule matches, use **Abrir archivo** to go straight to its source and line reference. If none matches, stop hunting through Hyprland rules: check the app or layout instead.
-5. Only then use a small action or choose **Recordar** to create a reversible placement rule.
+2. Choose the question that matches what went wrong.
+3. For a window, click it and read the answer: **a placement rule**, **style-only rules**, or **no static rule**.
+4. For an atajo, write it as you press it (`Super Shift I`) and OmaWhy finds its definition or tells you it is disabled/missing.
+5. For general trouble, use **Revisar estado del escritorio** before changing random files.
+6. Only then use a small action or choose **Recordar** to create a reversible placement rule.
 
 ### Actions
 
