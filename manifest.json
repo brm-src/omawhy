@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "io.github.brm-src.omawhy",
+  "name": "OmaWhy",
+  "version": "1.0.0",
+  "author": "brm-src",
+  "license": "MIT",
+  "description": "Inspect any Hyprland window, explain its placement, and save reversible rules.",
+  "kinds": ["service"],
+  "entryPoints": {
+    "service": "OmaWhy.qml"
+  }
+}
