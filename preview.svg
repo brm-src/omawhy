@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1000" viewBox="0 0 1600 1000" role="img" aria-labelledby="title desc">
+  <title id="title">OmaWhy window inspector preview</title>
+  <desc id="desc">A faithful product preview of the OmaWhy Omarchy overlay inspecting a Firefox window.</desc>
+  <defs>
+    <linearGradient id="desktop" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#101018"/><stop offset="1" stop-color="#1c1323"/></linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#272334"/><stop offset="1" stop-color="#16141f"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="22" stdDeviation="20" flood-color="#000" flood-opacity=".55"/></filter>
+    <filter id="soft"><feGaussianBlur stdDeviation="22"/></filter>
+  </defs>
+
+  <rect width="1600" height="1000" fill="url(#desktop)"/>
+  <circle cx="1430" cy="110" r="230" fill="#e0228f" opacity=".14" filter="url(#soft)"/>
+  <circle cx="120" cy="920" r="280" fill="#7f5af0" opacity=".12" filter="url(#soft)"/>
+
+  <text x="78" y="92" fill="#f5f2ff" font-family="monospace" font-weight="700" font-size="31" letter-spacing="5">OMAWHY</text>
+  <text x="78" y="130" fill="#b9b2c8" font-family="sans-serif" font-size="20">Entiende las reglas de Hyprland mirando la ventana.</text>
+  <text x="1320" y="95" fill="#e0228f" font-family="monospace" font-size="17" font-weight="700">SUPER + SHIFT + I</text>
+
+  <!-- background desktop and selected app -->
+  <rect x="68" y="177" width="965" height="684" rx="20" fill="#0a0a10" opacity=".76" stroke="#756e87" stroke-opacity=".35"/>
+  <rect x="69" y="178" width="963" height="52" rx="20" fill="#312b3b" opacity=".95"/>
+  <circle cx="104" cy="204" r="7" fill="#ff5d75"/><circle cx="128" cy="204" r="7" fill="#f6c45d"/><circle cx="152" cy="204" r="7" fill="#62d995"/>
+  <text x="190" y="211" fill="#dcd7e8" font-family="sans-serif" font-size="18">YouTube — Firefox</text>
+  <rect x="94" y="253" width="910" height="568" rx="12" fill="#18151f"/>
+  <rect x="94" y="253" width="910" height="62" rx="12" fill="#25202d"/>
+  <rect x="124" y="272" width="392" height="27" rx="13" fill="#0e0c13"/>
+  <text x="145" y="291" fill="#bdb6c8" font-family="sans-serif" font-size="15">youtube.com/watch?v=…</text>
+  <rect x="124" y="342" width="538" height="302" rx="10" fill="#312835"/>
+  <polygon points="364,432 364,554 475,493" fill="#ff3366" opacity=".86"/>
+  <rect x="124" y="673" width="528" height="21" rx="10" fill="#3a3341"/>
+  <rect x="124" y="673" width="221" height="21" rx="10" fill="#e0228f"/>
+  <rect x="699" y="344" width="253" height="24" rx="12" fill="#403748"/>
+  <rect x="699" y="389" width="225" height="16" rx="8" fill="#312a38"/>
+  <rect x="699" y="424" width="235" height="16" rx="8" fill="#312a38"/>
+  <rect x="699" y="476" width="204" height="118" rx="10" fill="#28222f"/>
+  <text x="124" y="747" fill="#f1ecf8" font-family="sans-serif" font-size="22" font-weight="700">YouTube</text>
+  <text x="124" y="779" fill="#9e96ad" font-family="sans-serif" font-size="16">Una ventana abierta en el lugar equivocado.</text>
+
+  <!-- Dimmed selection state -->
+  <rect x="68" y="177" width="965" height="684" rx="20" fill="#08070b" opacity=".46"/>
+  <rect x="82" y="190" width="937" height="658" rx="16" fill="none" stroke="#e0228f" stroke-width="2" stroke-dasharray="8 8" opacity=".86"/>
+  <path d="M 1000 514 C 1090 514, 1118 483, 1175 463" fill="none" stroke="#e0228f" stroke-width="3" stroke-dasharray="7 8"/>
+  <circle cx="1000" cy="514" r="8" fill="#e0228f"/>
+  <text x="96" y="830" fill="#eab3d6" font-family="monospace" font-size="16">← ventana seleccionada</text>
+
+  <!-- actual overlay card composition -->
+  <g filter="url(#shadow)">
+    <rect x="861" y="197" width="640" height="666" rx="18" fill="url(#glass)" stroke="#e0228f" stroke-width="2"/>
+    <rect x="861" y="197" width="640" height="54" rx="18" fill="#3b2439" opacity=".7"/>
+  </g>
+  <text x="900" y="234" fill="#ff64b7" font-family="monospace" font-size="18" font-weight="700" letter-spacing="3">OMAWHY</text>
+  <text x="900" y="286" fill="#fbf8ff" font-family="sans-serif" font-size="31" font-weight="700">YouTube</text>
+  <line x1="900" x2="1460" y1="308" y2="308" stroke="#84778f" stroke-opacity=".35"/>
+
+  <g font-family="monospace" font-size="16">
+    <g fill="#ada5b9"><text x="900" y="350">App ID</text><text x="900" y="387">Título</text><text x="900" y="424">Workspace</text><text x="900" y="461">Monitor</text><text x="900" y="498">Flotante</text><text x="900" y="535">Pantalla completa</text><text x="900" y="572">Fijada</text><text x="900" y="609">PID</text><text x="900" y="646">Dirección</text></g>
+    <g fill="#f5f0fa"><text x="1080" y="350">firefox</text><text x="1080" y="387">YouTube</text><text x="1080" y="424">3</text><text x="1080" y="461">HDMI-A-1</text><text x="1080" y="498">no</text><text x="1080" y="535">no</text><text x="1080" y="572">no</text><text x="1080" y="609">8421</text><text x="1080" y="646">0x1234</text></g>
+  </g>
+
+  <!-- action chips matching plugin action set -->
+  <g font-family="sans-serif" font-size="14" text-anchor="middle">
+    <rect x="900" y="684" width="114" height="34" rx="8" fill="#3a3444"/><text x="957" y="706" fill="#fff">Copiar App ID</text>
+    <rect x="1024" y="684" width="103" height="34" rx="8" fill="#3a3444"/><text x="1075" y="706" fill="#fff">Copiar regla</text>
+    <rect x="1137" y="684" width="104" height="34" rx="8" fill="#3a3444"/><text x="1189" y="706" fill="#fff">Mover aquí</text>
+    <rect x="1251" y="684" width="89" height="34" rx="8" fill="#3a3444"/><text x="1295" y="706" fill="#fff">Centrar</text>
+    <rect x="1350" y="684" width="110" height="34" rx="8" fill="#3a3444"/><text x="1405" y="706" fill="#fff">Flotante</text>
+    <rect x="900" y="730" width="103" height="34" rx="8" fill="#3a3444"/><text x="951" y="752" fill="#fff">Fullscreen</text>
+    <rect x="1013" y="730" width="82" height="34" rx="8" fill="#3a3444"/><text x="1054" y="752" fill="#fff">Fijar</text>
+    <rect x="1105" y="730" width="109" height="34" rx="8" fill="#3a3444"/><text x="1160" y="752" fill="#fff">Abrir reglas</text>
+    <rect x="1224" y="730" width="93" height="34" rx="8" fill="#3a3444"/><text x="1270" y="752" fill="#fff">Deshacer</text>
+    <rect x="1327" y="730" width="133" height="34" rx="8" fill="#e0228f"/><text x="1394" y="752" fill="#1b1019" font-weight="700">Recordar</text>
+  </g>
+  <text x="900" y="808" fill="#b7aebe" font-family="sans-serif" font-size="15">Ventana inspeccionada. La regla se guarda solo al confirmar.</text>
+
+  <text x="78" y="933" fill="#c3bacb" font-family="sans-serif" font-size="18">Inspector de ventanas para Omarchy · sin cuentas, APIs ni servicios externos</text>
+  <text x="78" y="966" fill="#8f849b" font-family="monospace" font-size="15">app_id / class · monitor · workspace · regla reversible</text>
+</svg>

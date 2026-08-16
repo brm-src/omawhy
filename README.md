@@ -6,6 +6,10 @@ OmaWhy is an Omarchy Quattro service for anyone who has asked: *why did this win
 
 Press `Super + Shift + I`, click a window, and get its real Hyprland identity and state. From the same overlay, copy a rule, correct the window, or save its current placement as a reversible rule.
 
+![Illustrated OmaWhy UI preview](preview.png)
+
+*Illustrated product preview based on the plugin interface; it is not a desktop screenshot.*
+
 ## Install
 
 ```bash
