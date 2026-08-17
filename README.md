@@ -1,5 +1,9 @@
 # OmaWhy
 
+<p align="center">
+  <a href="https://www.ko-fi.com/brmcl"><img src="https://ko-fi.com/img/githubbutton_sm.svg" alt="Support me on Ko-fi" /></a>
+</p>
+
 **Ask why Omarchy did that — and get an answer backed by its real configuration.**
 
 OmaWhy is an Omarchy Quattro diagnostic service. Open it and choose a real question:
