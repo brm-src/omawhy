@@ -184,22 +184,22 @@ class NormalizeWindowTests(unittest.TestCase):
             bindings.write_text("# My own binding\n", encoding="utf-8")
             env = os.environ | {"HOME": str(home), "XDG_CONFIG_HOME": str(home / ".config")}
 
-            installed = subprocess.run(["bash", "setup.sh"], cwd=Path(__file__).parents[1], env=env, text=True, capture_output=True)
+            installed = subprocess.run(["bash", "configure-shortcut.sh"], cwd=Path(__file__).parents[1], env=env, text=True, capture_output=True)
             self.assertEqual(installed.returncode, 0, installed.stderr)
             self.assertEqual(bindings.read_text(encoding="utf-8").count("OmaWhy: begin"), 1)
 
-            removed = subprocess.run(["bash", "setup.sh", "--remove"], cwd=Path(__file__).parents[1], env=env, text=True, capture_output=True)
+            removed = subprocess.run(["bash", "configure-shortcut.sh", "--remove"], cwd=Path(__file__).parents[1], env=env, text=True, capture_output=True)
             self.assertEqual(removed.returncode, 0, removed.stderr)
             self.assertEqual(bindings.read_text(encoding="utf-8"), "# My own binding\n")
 
             (config / "hyprland.lua").write_text('require("hypr.bindings")\n', encoding="utf-8")
             lua_bindings = config / "bindings.lua"
             lua_bindings.write_text("-- My own Lua binding\n", encoding="utf-8")
-            installed_lua = subprocess.run(["bash", "setup.sh"], cwd=Path(__file__).parents[1], env=env, text=True, capture_output=True)
+            installed_lua = subprocess.run(["bash", "configure-shortcut.sh"], cwd=Path(__file__).parents[1], env=env, text=True, capture_output=True)
             self.assertEqual(installed_lua.returncode, 0, installed_lua.stderr)
             self.assertIn('o.bind("SUPER + SHIFT + I", "OmaWhy"', lua_bindings.read_text(encoding="utf-8"))
 
-            removed_lua = subprocess.run(["bash", "setup.sh", "--remove"], cwd=Path(__file__).parents[1], env=env, text=True, capture_output=True)
+            removed_lua = subprocess.run(["bash", "configure-shortcut.sh", "--remove"], cwd=Path(__file__).parents[1], env=env, text=True, capture_output=True)
             self.assertEqual(removed_lua.returncode, 0, removed_lua.stderr)
             self.assertEqual(lua_bindings.read_text(encoding="utf-8"), "-- My own Lua binding\n")
 
