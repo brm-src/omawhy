@@ -13,6 +13,7 @@ from omawhy import (
     inspect_window_at_cursor,
     normalize_window,
     remember_window,
+    scan_problems,
     undo_last_change,
     window_at_cursor,
 )
@@ -311,6 +312,73 @@ class NormalizeWindowTests(unittest.TestCase):
 
             self.assertEqual(diagnosis["verdict"], "disabled")
             self.assertEqual(diagnosis["events"][0]["line"], 1)
+
+    def test_scan_reports_missing_binary_duplicate_shortcut_and_broken_source(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            hypr = home / ".config" / "hypr"
+            hypr.mkdir(parents=True)
+            (hypr / "hyprland.conf").write_text(
+                'source = ~/.local/share/omarchy/default/hypr/autostart.conf\n',
+                encoding="utf-8",
+            )
+            bindings = hypr / "bindings.conf"
+            bindings.write_text(
+                'bindd = SUPER SHIFT, R, launch-terminal, exec, alacritty\n'
+                'bindd = SUPER SHIFT, R, launch-file-manager, exec, nemo\n',
+                encoding="utf-8",
+            )
+
+            result = scan_problems(
+                home=home,
+                omarchy_root=home / "missing-omarchy",
+                which_command=lambda binary: binary == "nemo",
+                check_command=lambda command: False,
+            )
+
+            titles = [problem["title"] for problem in result["problems"]]
+            self.assertIn("Comando apunta a un ejecutable que no existe", titles)
+            self.assertIn("Atajo definido más de una vez", titles)
+            self.assertIn("Source a un archivo que no existe", titles)
+            missing = next(p for p in result["problems"] if p["title"].startswith("Comando"))
+            self.assertIn("alacritty", missing["detail"])
+            self.assertEqual(missing["path"], str(bindings))
+            self.assertEqual(missing["line"], 1)
+
+    def test_scan_returns_empty_for_a_clean_config(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            hypr = home / ".config" / "hypr"
+            hypr.mkdir(parents=True)
+            (hypr / "hyprland.conf").write_text('bindd = SUPER SHIFT, I, test, exec, nemo\n', encoding="utf-8")
+
+            result = scan_problems(
+                home=home,
+                omarchy_root=home / "missing-omarchy",
+                which_command=lambda binary: True,
+                check_command=lambda command: True,
+            )
+
+            self.assertEqual(result["total"], 0)
+            self.assertEqual(result["message"], "No encontré problemas evidentes.")
+
+    def test_scan_reports_broken_lua_require(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            hypr = home / ".config" / "hypr"
+            hypr.mkdir(parents=True)
+            (hypr / "hyprland.lua").write_text('require("hypr.ghost")\n', encoding="utf-8")
+
+            result = scan_problems(
+                home=home,
+                omarchy_root=home / "missing-omarchy",
+                which_command=lambda binary: True,
+                check_command=lambda command: True,
+            )
+
+            self.assertEqual(result["total"], 1)
+            self.assertIn("Require a un archivo que no existe", result["problems"][0]["title"])
+            self.assertIn("ghost.lua", result["problems"][0]["detail"])
 
 
 if __name__ == "__main__":

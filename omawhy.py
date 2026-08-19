@@ -457,6 +457,237 @@ def inspect_window_at_cursor(clients, cursor, monitors):
     return window
 
 
+def _command_binary(command):
+    """Extract the first executable token from a Hyprland exec command."""
+    tokens = str(command or "").strip().split()
+    if not tokens:
+        return None
+    head = tokens[0].strip("\"'")
+    if head in {"exec", "execr", "execrm"}:
+        head = tokens[1].strip("\"'") if len(tokens) > 1 else None
+    if not head or "=" in head:
+        return None
+    return head.split("/")[-1]
+
+
+def _collect_binding_events(home, omarchy_root):
+    """All bind/unbind events across default and user config, newest file order last."""
+    candidates = [
+        omarchy_root / "default" / "hypr" / "bindings.lua",
+        omarchy_root / "default" / "hypr" / "bindings.conf",
+        home / ".config" / "hypr" / "bindings.lua",
+        home / ".config" / "hypr" / "bindings.conf",
+    ]
+    events = []
+    for path in candidates:
+        if path.exists():
+            events.extend(_shortcut_events(path))
+    return events
+
+
+def _lua_requires(home, omarchy_root):
+    """Find require() calls in the active Lua config that point to missing files."""
+    root = home / ".config" / "hypr" / "hyprland.lua"
+    if not root.exists():
+        return []
+    visited, problems = set(), []
+
+    def visit(path):
+        path = path.resolve()
+        if path in visited or not path.exists():
+            return
+        visited.add(path)
+        text = path.read_text(encoding="utf-8", errors="replace")
+        for match in re.finditer(r"(?:require|require_optional\.module)\(\s*[\"']([^\"']+)[\"']\s*\)", text):
+            module = match.group(1)
+            candidate = _resolve_lua_module(module, home, omarchy_root)
+            if candidate is None or candidate.exists():
+                continue
+            problems.append({
+                "severity": "warning",
+                "title": "Require a un archivo que no existe",
+                "detail": "require(\"" + module + "\") no resuelve a " + str(candidate),
+                "path": str(path),
+                "line": text.count("\n", 0, match.start()) + 1,
+            })
+        for sub in re.findall(r"(?:require|require_optional\.module)\(\s*[\"']([^\"']+)[\"']\s*\)", text):
+            candidate = _resolve_lua_module(sub, home, omarchy_root)
+            if candidate:
+                visit(candidate)
+        for match in re.finditer(r"require_all\.files\(", text):
+            for candidate in sorted((omarchy_root / "default" / "hypr" / "apps").glob("*.lua")):
+                visit(candidate)
+
+    visit(root)
+    return problems
+
+
+def _conf_sources(home):
+    """Find source= lines in classic config pointing to missing files."""
+    root = home / ".config" / "hypr" / "hyprland.conf"
+    if not root.exists():
+        return []
+    problems = []
+    for path in _discover_conf_files(home):
+        for number, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+            found = re.match(r"^\s*source\s*=\s*(.*?)\s*$", line)
+            if not found:
+                continue
+            expanded = Path(found.group(1).strip().replace("~", str(home), 1))
+            exists = bool(list(expanded.parent.glob(expanded.name))) if any(mark in found.group(1) for mark in "*?[") else expanded.exists()
+            if not exists:
+                problems.append({
+                    "severity": "warning",
+                    "title": "Source a un archivo que no existe",
+                    "detail": "source = " + found.group(1).strip() + " no se encuentra",
+                    "path": str(path),
+                    "line": number,
+                })
+    return problems
+
+
+def _duplicate_shortcuts(events):
+    """Report shortcut combos bound more than once without a later unbind."""
+    by_keys = {}
+    for event in events:
+        by_keys.setdefault(event["keys"], []).append(event)
+    problems = []
+    for keys, group in by_keys.items():
+        binds = [e for e in group if e["action"] == "bind"]
+        unbinds = [e for e in group if e["action"] == "unbind"]
+        if len(binds) > 1 and not unbinds:
+            ordered = sorted(binds, key=lambda e: e["line"])
+            last = ordered[-1]
+            problems.append({
+                "severity": "warning",
+                "title": "Atajo definido más de una vez",
+                "detail": "\"" + keys + "\" se define " + str(len(ordered)) + " veces; gana el último en " + Path(last["path"]).name + ", línea " + str(last["line"]) + ". El resto se ignora en silencio.",
+                "path": last["path"],
+                "line": last["line"],
+                "keys": keys,
+            })
+    return problems
+
+
+def _broken_shortcut_commands(events, which_command=None):
+    """Report bound commands whose first executable does not exist on PATH."""
+    if which_command is None:
+        def which(binary):
+            return shutil.which(binary) is not None
+    else:
+        which = which_command
+    problems = []
+    seen = set()
+    for event in events:
+        if event["action"] != "bind":
+            continue
+        command = event.get("command") or event.get("label") or ""
+        if event.get("command") == "comando compuesto" or not command:
+            continue
+        binary = _command_binary(command)
+        if not binary or binary in seen:
+            continue
+        seen.add(binary)
+        if not which(binary):
+            problems.append({
+                "severity": "error",
+                "title": "Comando apunta a un ejecutable que no existe",
+                "detail": "\"" + binary + "\" no está en el PATH. El atajo \"" + event["keys"] + "\" no va a funcionar hasta que instales el programa o corrijas el comando.",
+                "path": event["path"],
+                "line": event["line"],
+            })
+    return problems
+
+
+def _broken_window_rule_matches(home):
+    """Report window rules whose regex cannot compile (would fail to match anything)."""
+    problems = []
+    for path in _discover_conf_files(home):
+        for number, line in enumerate(path.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+            found = re.match(r"^\s*windowrule(?:v2)?\s*=\s*(.+)$", line)
+            if not found:
+                continue
+            parts = _split_top_level(found.group(1))
+            for item in parts[1:]:
+                matched = re.match(r"match:(class|title)\s+(.+)$", item)
+                if not matched:
+                    continue
+                pattern = matched.group(2)
+                try:
+                    re.compile(pattern)
+                except re.error as error:
+                    problems.append({
+                        "severity": "error",
+                        "title": "Regla de ventana con expresión inválida",
+                        "detail": "match:" + matched.group(1) + " " + pattern + " no compila (" + str(error) + "). La regla nunca va a coincidir.",
+                        "path": str(path),
+                        "line": number,
+                    })
+    return problems
+
+
+def scan_problems(home=None, omarchy_root=None, which_command=None, check_command=None):
+    """Scan the active Omarchy/Hyprland config for real, verifiable problems.
+
+    Only reports findings backed by files, PATH state, or process state.
+    Never guesses a cause that cannot be evidenced.
+    """
+    home = Path(home or Path.home())
+    omarchy_root = Path(omarchy_root or os.getenv("OMARCHY_PATH", "/usr/share/omarchy"))
+    problems = []
+
+    events = _collect_binding_events(home, omarchy_root)
+    problems.extend(_duplicate_shortcuts(events))
+    problems.extend(_broken_shortcut_commands(events, which_command=which_command))
+    problems.extend(_lua_requires(home, omarchy_root))
+    problems.extend(_conf_sources(home))
+    problems.extend(_broken_window_rule_matches(home))
+
+    if check_command is None:
+        def runner(command):
+            return subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False).returncode == 0
+    else:
+        runner = check_command
+
+    hypr_dir = home / ".config" / "hypr"
+    config = "lua" if (hypr_dir / "hyprland.lua").exists() else "classic" if (hypr_dir / "hyprland.conf").exists() else "missing"
+    if config == "missing":
+        problems.append({
+            "severity": "error",
+            "title": "No hay configuración activa de Hyprland",
+            "detail": "No encontré hyprland.lua ni hyprland.conf en " + str(hypr_dir) + ". Sin configuración, Omarchy no puede cargar reglas ni atajos.",
+            "path": str(hypr_dir),
+            "line": 0,
+        })
+    if not runner(["hyprctl", "-j", "version"]):
+        problems.append({
+            "severity": "error",
+            "title": "Hyprland no responde",
+            "detail": "hyprctl no devuelve versión. Revisa que la sesión Hyprland esté viva antes de culpar a Omarchy.",
+            "path": "",
+            "line": 0,
+        })
+    if not runner(["pgrep", "-x", "quickshell"]):
+        problems.append({
+            "severity": "warning",
+            "title": "Quickshell no está corriendo",
+            "detail": "El shell de Omarchy no responde; los paneles y plugins no se van a mostrar.",
+            "path": "",
+            "line": 0,
+        })
+
+    counts = {"error": 0, "warning": 0, "info": 0}
+    for problem in problems:
+        counts[problem["severity"]] = counts.get(problem["severity"], 0) + 1
+    total = len(problems)
+    message = (
+        "No encontré problemas evidentes."
+        if total == 0
+        else "Encontré " + str(total) + " problema" + ("s" if total != 1 else "") + " que revisar."
+    )
+    return {"summary": counts, "total": total, "problems": problems, "message": message}
+
+
 def _atomic_write(path, text):
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + ".tmp")
@@ -578,6 +809,7 @@ def main(argv=None):
     shortcut_parser = subcommands.add_parser("shortcut")
     shortcut_parser.add_argument("--keys", required=True)
     subcommands.add_parser("desktop-status")
+    subcommands.add_parser("scan")
     open_rule_parser = subcommands.add_parser("open-rule")
     open_rule_parser.add_argument("--path", required=True)
     window_parser = subcommands.add_parser("action")
@@ -601,6 +833,8 @@ def main(argv=None):
             return _emit({"ok": True, "diagnosis": diagnose_shortcut(args.keys)})
         if args.command == "desktop-status":
             return _emit({"ok": True, "status": desktop_status()})
+        if args.command == "scan":
+            return _emit({"ok": True, "scan": scan_problems()})
         if args.command == "open-rule":
             path = Path(args.path).expanduser().resolve()
             allowed = [Path.home() / ".config" / "hypr", Path(os.getenv("OMARCHY_PATH", "/usr/share/omarchy")) / "default" / "hypr"]

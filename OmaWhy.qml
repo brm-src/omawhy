@@ -10,10 +10,11 @@ Item {
   readonly property string pluginId: "io.github.brm-src.omawhy"
   readonly property string helperPath: Qt.resolvedUrl("omawhy.py").toString().replace("file://", "")
   property bool opened: false
-  property string phase: "home" // home, pick, inspect, confirm, shortcut, status
+  property string phase: "home" // home, scan, pick, inspect, confirm, shortcut, status
   property var selected: ({})
   property var explanation: ({})
   property var diagnostic: ({})
+  property var scanResult: ({})
   property string status: ""
   property var processCallback: null
 
@@ -23,6 +24,7 @@ Item {
     root.selected = ({})
     root.explanation = ({})
     root.diagnostic = ({})
+    root.scanResult = ({})
     root.status = "¿Qué quieres entender?"
   }
 
@@ -32,6 +34,7 @@ Item {
     root.selected = ({})
     root.explanation = ({})
     root.diagnostic = ({})
+    root.scanResult = ({})
     root.status = ""
   }
 
@@ -128,6 +131,33 @@ Item {
       root.diagnostic = payload.status || ({})
       root.status = root.diagnostic.message || "Estado revisado."
     })
+  }
+
+  function runScan() {
+    root.phase = "scan"
+    root.scanResult = ({})
+    root.status = "Revisando configuración, atajos y procesos…"
+    root.runHelper(["scan"], function(payload) {
+      if (!payload.ok) {
+        root.status = payload.error || "No se pudo escanear el sistema."
+        return
+      }
+      root.scanResult = payload.scan || ({})
+      root.status = root.scanResult.message || "Escaneo listo."
+    })
+  }
+
+  function openProblemSource(problem) {
+    if (!problem.path) return
+    root.runHelper(["open-rule", "--path", String(problem.path)], function(payload) {
+      root.status = payload.message || payload.error || "Listo."
+    })
+  }
+
+  function severityLabel(severity) {
+    if (severity === "error") return "ERROR"
+    if (severity === "warning") return "OJO"
+    return "INFO"
   }
 
   function inspectAtCursor() {
@@ -243,7 +273,7 @@ Item {
         id: homeCard
         visible: root.phase === "home"
         z: 3
-        width: Math.min(500, parent.width - 36)
+        width: Math.min(540, parent.width - 36)
         height: homeContent.implicitHeight + 34
         anchors.centerIn: parent
         radius: 14
@@ -266,7 +296,7 @@ Item {
           }
           Text {
             width: parent.width
-            text: "¿Qué hizo raro Omarchy?"
+            text: "¿Qué está pasando en Omarchy?"
             color: Color.foreground
             font.family: Style.font.family
             font.pixelSize: 21
@@ -274,12 +304,46 @@ Item {
           }
           Text {
             width: parent.width
-            text: "Elige una pregunta. OmaWhy revisa configuración y procesos reales; no inventa una causa si no hay evidencia."
+            text: "OmaWhy revisa tu configuración y procesos reales y explica el porqué. Solo reporta lo que puede evidenciar; no inventa causas."
             color: Util.alpha(Color.foreground, 0.70)
             font.family: Style.font.family
             font.pixelSize: 12
             wrapMode: Text.Wrap
           }
+
+          Rectangle {
+            width: homeContent.width
+            height: scanOptionContent.implicitHeight + 18
+            radius: 9
+            color: scanOptionMouse.containsMouse ? Util.alpha(Color.accent, 0.30) : Util.alpha(Color.accent, 0.16)
+            border.width: 1
+            border.color: Util.alpha(Color.accent, 0.7)
+            Column {
+              id: scanOptionContent
+              anchors.fill: parent
+              anchors.margins: 10
+              spacing: 3
+              Text { text: "Revisar el sistema completo"; color: Color.foreground; font.family: Style.font.family; font.pixelSize: 14; font.bold: true }
+              Text { width: parent.width; text: "Busca atajos rotos, ejecutables inexistentes, fuentes perdidas y reglas inválidas."; color: Util.alpha(Color.foreground, 0.68); font.family: Style.font.family; font.pixelSize: 11; wrapMode: Text.Wrap }
+            }
+            MouseArea {
+              id: scanOptionMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.runScan()
+            }
+          }
+
+          Text {
+            width: parent.width
+            text: "O pregúntale por algo puntual:"
+            color: Util.alpha(Color.foreground, 0.75)
+            font.family: Style.font.family
+            font.pixelSize: 12
+            font.bold: true
+          }
+
           Repeater {
             model: [
               ["Una ventana quedó mal", "¿Por qué abrió aquí, en este monitor o workspace?", "window"],
@@ -309,6 +373,142 @@ Item {
                   else if (modelData[2] === "shortcut") { root.phase = "shortcut"; root.diagnostic = ({}) }
                   else { root.phase = "status"; root.diagnostic = ({}); root.inspectDesktop() }
                 }
+              }
+            }
+          }
+        }
+      }
+
+      Rectangle {
+        id: scanCard
+        visible: root.phase === "scan"
+        z: 3
+        width: Math.min(600, parent.width - 36)
+        height: Math.min(scanContent.implicitHeight + 34, parent.height - 36)
+        anchors.centerIn: parent
+        radius: 14
+        color: Util.alpha(Color.background, 0.98)
+        border.width: 1
+        border.color: Util.alpha(Color.accent, 0.82)
+
+        Flickable {
+          anchors.fill: parent
+          anchors.margins: 17
+          contentWidth: width
+          contentHeight: scanContent.implicitHeight
+          clip: true
+
+          Column {
+            id: scanContent
+            width: parent.width
+            spacing: 10
+            Text { text: "OMAWHY"; color: Color.accent; font.family: Style.font.family; font.pixelSize: 12; font.bold: true; font.letterSpacing: 1.5 }
+            Text {
+              width: parent.width
+              text: "Revisión del sistema"
+              color: Color.foreground
+              font.family: Style.font.family
+              font.pixelSize: 20
+              font.bold: true
+              wrapMode: Text.Wrap
+            }
+            Text {
+              width: parent.width
+              text: root.status
+              color: Util.alpha(Color.foreground, 0.70)
+              font.family: Style.font.family
+              font.pixelSize: 12
+              wrapMode: Text.Wrap
+            }
+            Rectangle {
+              visible: root.scanResult.total !== undefined
+              width: parent.width
+              height: summaryText.implicitHeight + 18
+              radius: 9
+              color: root.scanResult.total > 0 ? Util.alpha(Color.accent, 0.16) : Util.alpha(Color.accent, 0.12)
+              border.width: 1
+              border.color: Util.alpha(Color.accent, 0.6)
+              Text {
+                id: summaryText
+                anchors.fill: parent
+                anchors.margins: 9
+                text: root.scanResult.total > 0
+                  ? (root.scanResult.summary.error || 0) + " errores · " + (root.scanResult.summary.warning || 0) + " avisos"
+                  : "Todo en orden. No encontré problemas evidentes."
+                color: Color.foreground
+                font.family: Style.font.family
+                font.pixelSize: 13
+                font.bold: true
+                wrapMode: Text.Wrap
+              }
+            }
+            Repeater {
+              visible: root.scanResult.problems !== undefined
+              model: root.scanResult.problems || []
+              delegate: Rectangle {
+                width: scanContent.width
+                height: problemColumn.implicitHeight + 16
+                radius: 8
+                color: modelData.severity === "error"
+                  ? Util.alpha("#d65a4a", 0.20)
+                  : Util.alpha(Color.foreground, 0.08)
+                border.width: 1
+                border.color: modelData.severity === "error"
+                  ? Util.alpha("#d65a4a", 0.6)
+                  : Util.alpha(Color.foreground, 0.16)
+                Column {
+                  id: problemColumn
+                  anchors.fill: parent
+                  anchors.margins: 9
+                  spacing: 4
+                  Text {
+                    width: parent.width
+                    text: (modelData.severity === "error" ? "ERROR · " : "OJO · ") + modelData.title
+                    color: modelData.severity === "error" ? "#e0705f" : Color.accent
+                    font.family: Style.font.family
+                    font.pixelSize: 12
+                    font.bold: true
+                    wrapMode: Text.Wrap
+                  }
+                  Text {
+                    width: parent.width
+                    text: String(modelData.detail || "")
+                    color: Color.foreground
+                    font.family: Style.font.family
+                    font.pixelSize: 11
+                    wrapMode: Text.Wrap
+                    textFormat: Text.PlainText
+                  }
+                  Text {
+                    visible: modelData.path
+                    width: parent.width
+                    text: (String(modelData.path || "").split("/").pop() || "") + (modelData.line ? ":" + modelData.line : "") + "  ·  abrir archivo"
+                    color: Util.alpha(Color.foreground, 0.65)
+                    font.family: Style.font.family
+                    font.pixelSize: 10
+                    font.underline: problemSourceMouse.containsMouse
+                    MouseArea {
+                      id: problemSourceMouse
+                      anchors.fill: parent
+                      hoverEnabled: true
+                      cursorShape: Qt.PointingHandCursor
+                      onClicked: root.openProblemSource(modelData)
+                    }
+                  }
+                }
+              }
+            }
+            Row {
+              spacing: 8
+              Rectangle {
+                width: 130; height: 32; radius: 7; color: scanAgain.containsMouse ? Util.alpha(Color.accent, 0.82) : Color.accent
+                Text { anchors.centerIn: parent; text: "Escanear otra vez"; color: Color.background; font.family: Style.font.family; font.pixelSize: 12; font.bold: true }
+                MouseArea { id: scanAgain; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.runScan() }
+              }
+              Rectangle {
+                width: 88; height: 32; radius: 7; color: Util.alpha(Color.foreground, 0.12)
+                Text { anchors.centerIn: parent; text: "Volver"; color: Color.foreground; font.family: Style.font.family; font.pixelSize: 12 }
+                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.open() }
               }
             }
           }

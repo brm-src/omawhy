@@ -6,11 +6,29 @@
 
 **Ask why Omarchy did that — and get an answer backed by its real configuration.**
 
-OmaWhy is an Omarchy Quattro diagnostic service. Open it and choose a real question:
+OmaWhy is an Omarchy diagnostic service that turns opaque Hyprland/Omarchy config into a readable answer. It only reports what it can evidence: files, PATH state, and running processes. It never invents a cause.
 
-- **A window ended up wrong**: find the rule that matches it, or prove no static rule did.
-- **A shortcut does nothing**: search where it is defined, replaced, or explicitly disabled.
-- **Check desktop status**: verify the active Hyprland configuration, Hyprland + Quickshell, and OmaWhy's own shortcut.
+![Illustrated OmaWhy UI preview](preview.png)
+
+*Illustrated product preview based on the plugin interface; it is not a desktop screenshot.*
+
+## The main feature: system scan
+
+Press `Super + Shift + I` and choose **Revisar el sistema completo**. OmaWhy scans your active configuration and reports real, verifiable problems with the file, line, and a plain-language explanation:
+
+- **Atajos rotos** — a shortcut whose command points to an executable that is not on your PATH (e.g. a key that opens `alacritty` when Alacritty is not installed).
+- **Atajos duplicados** — the same combo bound more than once; Hyprland silently uses the last one, which is why the first stopped working.
+- **Fuentes perdidas** — `source =` or `require(...)` lines pointing to files that do not exist.
+- **Reglas inválidas** — `windowrule` lines with a regex that cannot compile, so they never match anything.
+- **Estado base** — no active Hyprland config, Hyprland not responding, or Quickshell not running.
+
+Every problem shows its source file and line, with an **abrir archivo** action. Re-run the scan after a fix to confirm.
+
+## Ask a pointed question
+
+- **A window ended up wrong**: click the window and OmaWhy finds the rule that matches it, or proves no static rule did.
+- **A shortcut does nothing**: type it as you press it (`Super Shift I`) and OmaWhy finds where it is defined, replaced, or explicitly disabled.
+- **Desktop status**: verifies the active Hyprland configuration, Hyprland + Quickshell, and OmaWhy's own shortcut.
 
 For a window, OmaWhy reads modern Omarchy Lua rules (`o.window(...)`) and classic `windowrule` files. It reports one of three useful facts:
 
@@ -18,17 +36,11 @@ For a window, OmaWhy reads modern Omarchy Lua rules (`o.window(...)`) and classi
 - **Only style rules match**: opacity or tags affect the app, but they do **not** explain its workspace or monitor.
 - **No static rule matches**: the position is coming from the layout, the app itself, or another automation — not a hidden line in your config.
 
-Each match has an **Abrir archivo** action. From the same overlay, you can also correct the selected window or save its current placement as a reversible rule.
-
-![Illustrated OmaWhy UI preview](preview.png)
-
-*Illustrated product preview based on the plugin interface; it is not a desktop screenshot.*
-
 ## Install
 
 ```bash
 omarchy plugin add https://github.com/brm-src/omawhy.git --enable --yes
-~/.config/omarchy/plugins/io.github.brm-src.omawhy/setup.sh
+~/.config/omarchy/plugins/io.github.brm-src.omawhy/configure-shortcut.sh
 ```
 
 The second command adds exactly one marked binding and reloads Hyprland. It uses `~/.config/hypr/bindings.lua` on current Omarchy and falls back to `bindings.conf` on classic configurations:
@@ -42,10 +54,10 @@ It does not install packages, elevate permissions, access the network, or run au
 ## Use
 
 1. Press `Super + Shift + I`.
-2. Choose the question that matches what went wrong.
-3. For a window, click it and read the answer: **a placement rule**, **style-only rules**, or **no static rule**.
-4. For an atajo, write it as you press it (`Super Shift I`) and OmaWhy finds its definition or tells you it is disabled/missing.
-5. For general trouble, use **Revisar estado del escritorio** before changing random files.
+2. Start with **Revisar el sistema completo** when something looks off — it finds broken shortcuts, missing files, and invalid rules in one pass.
+3. Or choose the pointed question that matches what went wrong.
+4. For a window, click it and read the answer: **a placement rule**, **style-only rules**, or **no static rule**.
+5. For a shortcut, write it as you press it and OmaWhy finds its definition or tells you it is disabled/missing.
 6. Only then use a small action or choose **Recordar** to create a reversible placement rule.
 
 ### Actions
@@ -81,7 +93,7 @@ Rules use an anchored app identifier: `o.window("^app_id$", …)` on current Oma
 ## Remove
 
 ```bash
-~/.config/omarchy/plugins/io.github.brm-src.omawhy/setup.sh --remove
+~/.config/omarchy/plugins/io.github.brm-src.omawhy/configure-shortcut.sh --remove
 omarchy plugin remove io.github.brm-src.omawhy --yes
 ```
 
