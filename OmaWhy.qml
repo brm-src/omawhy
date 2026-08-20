@@ -236,6 +236,20 @@ Item {
     }
   }
 
+  Component {
+    id: sectionHeader
+    Text {
+      property alias label: text
+      width: parent.width
+      color: Color.accent
+      font.family: Style.font.menuFamily
+      font.pixelSize: 10
+      font.bold: true
+      font.letterSpacing: 1.0
+      elide: Text.ElideRight
+    }
+  }
+
   Variants {
     model: Quickshell.screens
 
@@ -335,7 +349,7 @@ Item {
           }
           Text {
             width: parent.width
-            text: root.words("¿Qué está pasando en Omarchy?", "What is happening in Omarchy?")
+            text: root.words("¿Por qué Omarchy?", "Why Omarchy?")
             color: Color.foreground
             font.family: Style.font.family
             font.pixelSize: 21
@@ -761,13 +775,11 @@ Item {
               width: parent.width
               spacing: Style.spacing.xs
 
-              Text {
-                text: root.words("COPIAR", "COPY")
-                color: Qt.darker(Color.foreground, 1.4)
-                font.family: Style.font.menuFamily
-                font.pixelSize: Style.font.caption
-                font.bold: true
+              Loader {
+                sourceComponent: sectionHeader
+                property string text: root.words("COPIAR", "COPY")
               }
+
               Flow {
                 width: parent.width
                 spacing: Style.spacing.sm
@@ -785,13 +797,7 @@ Item {
                 }
               }
               Ui.PanelSeparator {}
-              Text {
-                text: root.words("VENTANA", "WINDOW")
-                color: Qt.darker(Color.foreground, 1.4)
-                font.family: Style.font.menuFamily
-                font.pixelSize: Style.font.caption
-                font.bold: true
-              }
+              Loader { sourceComponent: sectionHeader; property string text: root.words("VENTANA", "WINDOW") }
               Flow {
                 width: parent.width
                 spacing: Style.spacing.sm
@@ -810,13 +816,7 @@ Item {
                 }
               }
               Ui.PanelSeparator {}
-              Text {
-                text: root.words("REGLAS", "RULES")
-                color: Qt.darker(Color.foreground, 1.4)
-                font.family: Style.font.menuFamily
-                font.pixelSize: Style.font.caption
-                font.bold: true
-              }
+              Loader { sourceComponent: sectionHeader; property string text: root.words("REGLAS", "RULES") }
               Flow {
                 width: parent.width
                 spacing: Style.spacing.sm
