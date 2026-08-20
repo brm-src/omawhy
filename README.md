@@ -22,7 +22,12 @@ Press `Super + Shift + I` and choose **Revisar el sistema completo**. OmaWhy sca
 - **Reglas inválidas** — `windowrule` lines with a regex that cannot compile, so they never match anything.
 - **Estado base** — no active Hyprland config, Hyprland not responding, or Quickshell not running.
 
-Every problem shows its source file and line, with an **abrir archivo** action. Re-run the scan after a fix to confirm.
+Every problem shows its source file and line, with an **abrir archivo** action. Re-run the scan after a fix to confirm, or use **Copiar diagnóstico** to copy the whole report to your clipboard for a bug report or a quick paste into a chat.
+
+### Keyboard
+
+- `Esc` or `Super + W` closes OmaWhy.
+- `Ctrl + Enter` runs the current shortcut/status check again.
 
 ## Ask a pointed question
 

@@ -164,6 +164,25 @@ Item {
     return "INFO"
   }
 
+  function copyDiagnostic() {
+    var problems = root.scanResult.problems || []
+    var lines = []
+    lines.push("OmaWhy · " + root.words("revisión del sistema", "system review"))
+    lines.push(root.scanResult.message || "")
+    lines.push(root.words("Total", "Total") + ": " + String(root.scanResult.total || 0) +
+      " (" + String(root.scanResult.summary ? root.scanResult.summary.error : 0) + " " + root.words("errores", "errors") +
+      " · " + String(root.scanResult.summary ? root.scanResult.summary.warning : 0) + " " + root.words("avisos", "warnings") + ")")
+    for (var i = 0; i < problems.length; i++) {
+      var p = problems[i]
+      lines.push("[" + root.severityLabel(p.severity) + "] " + String(p.title || ""))
+      if (p.detail) lines.push("    " + String(p.detail))
+      if (p.path) lines.push("    " + String(p.path) + (p.line ? ":" + String(p.line) : ""))
+    }
+    root.runHelper(["copy-stdin", "--text", lines.join("\n")], function(payload) {
+      root.status = payload.message || payload.error || root.words("Copiado.", "Copied.")
+    })
+  }
+
   function inspectAtCursor() {
     root.status = root.words("Leyendo la ventana…", "Reading the window…")
     root.runHelper(["inspect-at-cursor"], function(payload) {
@@ -233,11 +252,19 @@ Item {
       WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
 
       Keys.onEscapePressed: root.close()
+      Keys.onPressed: function(event) {
+        if (event.key === Qt.Key_W && (event.modifiers & Qt.MetaModifier)) {
+          root.close()
+          event.accepted = true
+        }
+      }
       focus: true
 
       Rectangle {
         anchors.fill: parent
-        color: root.phase === "pick" ? Util.alpha(Color.background, 0.18) : Util.alpha(Color.background, 0.66)
+        color: root.phase === "pick" ? Util.alpha(Color.background, 0.18) : Color.menu.scrim
+        opacity: root.opened ? 1 : 0
+        Behavior on opacity { NumberAnimation { duration: 160; easing.type: Easing.OutCubic } }
       }
 
       MouseArea {
@@ -254,10 +281,14 @@ Item {
         width: 390
         height: hintText.implicitHeight + 32
         anchors.centerIn: parent
-        radius: 12
-        color: Util.alpha(Color.background, 0.96)
-        border.width: 1
-        border.color: Util.alpha(Color.accent, 0.88)
+        radius: Style.cornerRadius
+        color: Color.menu.background
+        border.width: 0
+        scale: 1
+        opacity: 1
+        Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+        Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+        onVisibleChanged: { if (visible) { scale = 0.96; opacity = 0; Qt.callLater(function() { scale = 1; opacity = 1 }) } }
 
         Text {
           id: hintText
@@ -280,10 +311,14 @@ Item {
         width: Math.min(540, parent.width - 36)
         height: homeContent.implicitHeight + 34
         anchors.centerIn: parent
-        radius: 14
-        color: Util.alpha(Color.background, 0.98)
-        border.width: 1
-        border.color: Util.alpha(Color.accent, 0.82)
+        radius: Style.cornerRadius
+        color: Color.menu.background
+        border.width: 0
+        scale: 1
+        opacity: 1
+        Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+        Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+        onVisibleChanged: { if (visible) { scale = 0.96; opacity = 0; Qt.callLater(function() { scale = 1; opacity = 1 }) } }
 
         Column {
           id: homeContent
@@ -318,17 +353,17 @@ Item {
           Rectangle {
             width: homeContent.width
             height: scanOptionContent.implicitHeight + 18
-            radius: 9
-            color: scanOptionMouse.containsMouse ? Util.alpha(Color.accent, 0.30) : Util.alpha(Color.accent, 0.16)
+            radius: Style.cornerRadius
+            color: scanOptionMouse.containsMouse ? Style.selectedFillFor(Color.foreground, Color.accent) : Style.normalFillFor(Color.foreground, Color.accent)
             border.width: 1
-            border.color: Util.alpha(Color.accent, 0.7)
+            border.color: Util.alpha(Color.accent, 0.55)
             Column {
               id: scanOptionContent
               anchors.fill: parent
               anchors.margins: 10
               spacing: 3
-              Text { text: root.words("Revisar el sistema completo", "Scan the whole system"); color: Color.foreground; font.family: Style.font.family; font.pixelSize: 14; font.bold: true }
-              Text { width: parent.width; text: root.words("Busca atajos rotos, ejecutables inexistentes, fuentes perdidas y reglas inválidas.", "Finds broken shortcuts, missing executables, lost sources, and invalid rules."); color: Util.alpha(Color.foreground, 0.68); font.family: Style.font.family; font.pixelSize: 11; wrapMode: Text.Wrap }
+              Text { text: root.words("Revisar el sistema completo", "Scan the whole system"); color: Color.foreground; font.family: Style.font.menuFamily; font.pixelSize: 14; font.bold: true }
+              Text { width: parent.width; text: root.words("Busca atajos rotos, ejecutables inexistentes, fuentes perdidas y reglas inválidas.", "Finds broken shortcuts, missing executables, lost sources, and invalid rules."); color: Util.alpha(Color.foreground, 0.68); font.family: Style.font.menuFamily; font.pixelSize: 11; wrapMode: Text.Wrap }
             }
             MouseArea {
               id: scanOptionMouse
@@ -357,15 +392,16 @@ Item {
             delegate: Rectangle {
               width: homeContent.width
               height: optionContent.implicitHeight + 20
-              radius: 9
-              color: optionMouse.containsMouse ? Util.alpha(Color.accent, 0.22) : Util.alpha(Color.foreground, 0.07)
+              radius: Style.cornerRadius
+              color: optionMouse.containsMouse ? Style.hoverFillFor(Color.foreground, Color.accent) : Style.normalFillFor(Color.foreground, Color.accent)
+              border.width: 0
               Column {
                 id: optionContent
                 anchors.fill: parent
                 anchors.margins: 10
                 spacing: 3
-                Text { text: modelData[0]; color: Color.foreground; font.family: Style.font.family; font.pixelSize: 14; font.bold: true }
-                Text { width: parent.width; text: modelData[1]; color: Util.alpha(Color.foreground, 0.68); font.family: Style.font.family; font.pixelSize: 11; wrapMode: Text.Wrap }
+                Text { text: modelData[0]; color: Color.foreground; font.family: Style.font.menuFamily; font.pixelSize: 14; font.bold: true }
+                Text { width: parent.width; text: modelData[1]; color: Util.alpha(Color.foreground, 0.68); font.family: Style.font.menuFamily; font.pixelSize: 11; wrapMode: Text.Wrap }
               }
               MouseArea {
                 id: optionMouse
@@ -390,10 +426,14 @@ Item {
         width: Math.min(600, parent.width - 36)
         height: Math.min(scanContent.implicitHeight + 34, parent.height - 36)
         anchors.centerIn: parent
-        radius: 14
-        color: Util.alpha(Color.background, 0.98)
-        border.width: 1
-        border.color: Util.alpha(Color.accent, 0.82)
+        radius: Style.cornerRadius
+        color: Color.menu.background
+        border.width: 0
+        scale: 1
+        opacity: 1
+        Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+        Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+        onVisibleChanged: { if (visible) { scale = 0.96; opacity = 0; Qt.callLater(function() { scale = 1; opacity = 1 }) } }
 
         Flickable {
           anchors.fill: parent
@@ -503,16 +543,29 @@ Item {
               }
             }
             Row {
-              spacing: 8
-              Rectangle {
-                width: 130; height: 32; radius: 7; color: scanAgain.containsMouse ? Util.alpha(Color.accent, 0.82) : Color.accent
-                Text { anchors.centerIn: parent; text: root.words("Escanear otra vez", "Scan again"); color: Color.background; font.family: Style.font.family; font.pixelSize: 12; font.bold: true }
-                MouseArea { id: scanAgain; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.runScan() }
+              width: parent.width
+              spacing: Style.spacing.sm
+              Button {
+                id: scanAgain
+                text: root.words("Escanear otra vez", "Scan again")
+                bordered: true
+                fontFamily: Style.font.menuFamily
+                onClicked: root.runScan()
               }
-              Rectangle {
-                width: 88; height: 32; radius: 7; color: Util.alpha(Color.foreground, 0.12)
-                Text { anchors.centerIn: parent; text: root.words("Volver", "Back"); color: Color.foreground; font.family: Style.font.family; font.pixelSize: 12 }
-                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.open() }
+              Button {
+                id: copyDiagnosticButton
+                text: root.words("Copiar diagnóstico", "Copy report")
+                bordered: true
+                fontFamily: Style.font.menuFamily
+                enabled: root.scanResult.total !== undefined
+                tooltipText: root.words("Copia el resumen y los problemas al portapapeles.", "Copies the summary and problems to the clipboard.")
+                onClicked: root.copyDiagnostic()
+              }
+              Item { width: parent.width - scanAgain.width - copyDiagnosticButton.width - parent.spacing * 2; height: 1 }
+              Button {
+                text: root.words("Volver", "Back")
+                fontFamily: Style.font.menuFamily
+                onClicked: root.open()
               }
             }
           }
@@ -526,10 +579,14 @@ Item {
         width: Math.min(560, parent.width - 36)
         height: Math.min(content.implicitHeight + 34, parent.height - 36)
         anchors.centerIn: parent
-        radius: 14
-        color: Util.alpha(Color.background, 0.98)
-        border.width: 1
-        border.color: Util.alpha(Color.accent, 0.82)
+        radius: Style.cornerRadius
+        color: Color.menu.background
+        border.width: 0
+        scale: 1
+        opacity: 1
+        Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+        Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+        onVisibleChanged: { if (visible) { scale = 0.96; opacity = 0; Qt.callLater(function() { scale = 1; opacity = 1 }) } }
 
         Flickable {
           anchors.fill: parent
@@ -699,35 +756,79 @@ Item {
               lineHeight: 1.2
             }
 
-            Flow {
+            Column {
               visible: root.phase === "inspect"
               width: parent.width
-              spacing: 7
-              Repeater {
-                model: [
-                  [root.words("Copiar App ID", "Copy App ID"), "copy-app-id"], [root.words("Copiar Class", "Copy Class"), "copy-class"], [root.words("Copiar título", "Copy title"), "copy-title"],
-                  [root.words("Copiar regla", "Copy rule"), "copy-rule"], [root.words("Mover aquí", "Move here"), "move-current"], [root.words("Centrar", "Center"), "center"],
-                  [root.words("Alternar flotante", "Toggle floating"), "toggle-floating"], [root.words("Alternar pantalla completa", "Toggle fullscreen"), "toggle-fullscreen"], [root.words("Fijar", "Pin"), "toggle-pin"], [root.words("Abrir reglas", "Open rules"), "open-rules"],
-                  [root.words("Deshacer", "Undo"), "undo"], [root.words("Recordar", "Remember"), "remember"]
-                ]
-                delegate: Rectangle {
-                  width: actionText.implicitWidth + 20
-                  height: 30
-                  radius: 7
-                  color: actionMouse.containsMouse ? Util.alpha(Color.accent, 0.30) : Util.alpha(Color.foreground, 0.09)
-                  Text {
-                    id: actionText
-                    anchors.centerIn: parent
+              spacing: Style.spacing.xs
+
+              Text {
+                text: root.words("COPIAR", "COPY")
+                color: Qt.darker(Color.foreground, 1.4)
+                font.family: Style.font.menuFamily
+                font.pixelSize: Style.font.caption
+                font.bold: true
+              }
+              Flow {
+                width: parent.width
+                spacing: Style.spacing.sm
+                Repeater {
+                  model: [
+                    [root.words("App ID", "App ID"), "copy-app-id"], [root.words("Class", "Class"), "copy-class"], [root.words("Título", "Title"), "copy-title"], [root.words("Regla", "Rule"), "copy-rule"]
+                  ]
+                  delegate: Button {
+                    required property var modelData
                     text: modelData[0]
-                    color: Color.foreground
-                    font.family: Style.font.family
-                    font.pixelSize: 11
+                    bordered: true
+                    fontFamily: Style.font.menuFamily
+                    onClicked: root.action(modelData[1])
                   }
-                  MouseArea {
-                    id: actionMouse
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
+                }
+              }
+              Ui.PanelSeparator {}
+              Text {
+                text: root.words("VENTANA", "WINDOW")
+                color: Qt.darker(Color.foreground, 1.4)
+                font.family: Style.font.menuFamily
+                font.pixelSize: Style.font.caption
+                font.bold: true
+              }
+              Flow {
+                width: parent.width
+                spacing: Style.spacing.sm
+                Repeater {
+                  model: [
+                    [root.words("Mover aquí", "Move here"), "move-current"], [root.words("Centrar", "Center"), "center"],
+                    [root.words("Flotante", "Floating"), "toggle-floating"], [root.words("Pantalla completa", "Fullscreen"), "toggle-fullscreen"], [root.words("Fijar", "Pin"), "toggle-pin"]
+                  ]
+                  delegate: Button {
+                    required property var modelData
+                    text: modelData[0]
+                    bordered: true
+                    fontFamily: Style.font.menuFamily
+                    onClicked: root.action(modelData[1])
+                  }
+                }
+              }
+              Ui.PanelSeparator {}
+              Text {
+                text: root.words("REGLAS", "RULES")
+                color: Qt.darker(Color.foreground, 1.4)
+                font.family: Style.font.menuFamily
+                font.pixelSize: Style.font.caption
+                font.bold: true
+              }
+              Flow {
+                width: parent.width
+                spacing: Style.spacing.sm
+                Repeater {
+                  model: [
+                    [root.words("Abrir reglas", "Open rules"), "open-rules"], [root.words("Recordar posición", "Remember position"), "remember"], [root.words("Deshacer", "Undo"), "undo"]
+                  ]
+                  delegate: Button {
+                    required property var modelData
+                    text: modelData[0]
+                    bordered: true
+                    fontFamily: Style.font.menuFamily
                     onClicked: root.action(modelData[1])
                   }
                 }
@@ -736,16 +837,21 @@ Item {
 
             Row {
               visible: root.phase === "confirm"
-              spacing: 8
-              Rectangle {
-                width: 112; height: 32; radius: 7; color: Color.accent
-                Text { anchors.centerIn: parent; text: root.words("Recordar", "Remember"); color: Color.background; font.family: Style.font.family; font.bold: true; font.pixelSize: 12 }
-                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.saveRememberedRule() }
+              width: parent.width
+              spacing: Style.spacing.sm
+              Button {
+                text: root.words("Recordar", "Remember")
+                fontFamily: Style.font.menuFamily
+                background: Color.accent
+                foreground: Color.background
+                accent: Color.accent
+                onClicked: root.saveRememberedRule()
               }
-              Rectangle {
-                width: 88; height: 32; radius: 7; color: Util.alpha(Color.foreground, 0.12)
-                Text { anchors.centerIn: parent; text: root.words("Cancelar", "Cancel"); color: Color.foreground; font.family: Style.font.family; font.pixelSize: 12 }
-                MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.phase = "inspect" }
+              Button {
+                text: root.words("Cancelar", "Cancel")
+                bordered: true
+                fontFamily: Style.font.menuFamily
+                onClicked: root.phase = "inspect"
               }
             }
 
@@ -769,10 +875,14 @@ Item {
         width: Math.min(520, parent.width - 36)
         height: Math.min(diagnosticContent.implicitHeight + 34, parent.height - 36)
         anchors.centerIn: parent
-        radius: 14
-        color: Util.alpha(Color.background, 0.98)
-        border.width: 1
-        border.color: Util.alpha(Color.accent, 0.82)
+        radius: Style.cornerRadius
+        color: Color.menu.background
+        border.width: 0
+        scale: 1
+        opacity: 1
+        Behavior on scale { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+        Behavior on opacity { NumberAnimation { duration: 140; easing.type: Easing.OutCubic } }
+        onVisibleChanged: { if (visible) { scale = 0.96; opacity = 0; Qt.callLater(function() { scale = 1; opacity = 1 }) } }
 
         Flickable {
           anchors.fill: parent
@@ -810,11 +920,14 @@ Item {
               placeholderText: root.words("Ejemplo: Super Shift I", "Example: Super Shift I")
               onAccepted: root.inspectShortcut()
             }
-            Rectangle {
+            Button {
               visible: root.phase === "shortcut"
-              width: 96; height: 31; radius: 7; color: shortcutButton.containsMouse ? Util.alpha(Color.accent, 0.82) : Color.accent
-              Text { anchors.centerIn: parent; text: root.words("Revisar", "Check"); color: Color.background; font.family: Style.font.family; font.pixelSize: 12; font.bold: true }
-              MouseArea { id: shortcutButton; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.inspectShortcut() }
+              text: root.words("Revisar", "Check")
+              fontFamily: Style.font.menuFamily
+              background: Color.accent
+              foreground: Color.background
+              accent: Color.accent
+              onClicked: root.inspectShortcut()
             }
             Text {
               visible: root.phase === "status"
@@ -825,11 +938,14 @@ Item {
               font.pixelSize: 12
               wrapMode: Text.Wrap
             }
-            Rectangle {
+            Button {
               visible: root.phase === "status"
-              width: 110; height: 31; radius: 7; color: statusButton.containsMouse ? Util.alpha(Color.accent, 0.82) : Color.accent
-              Text { anchors.centerIn: parent; text: root.words("Revisar otra vez", "Check again"); color: Color.background; font.family: Style.font.family; font.pixelSize: 12; font.bold: true }
-              MouseArea { id: statusButton; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.inspectDesktop() }
+              text: root.words("Revisar otra vez", "Check again")
+              fontFamily: Style.font.menuFamily
+              background: Color.accent
+              foreground: Color.background
+              accent: Color.accent
+              onClicked: root.inspectDesktop()
             }
             Rectangle {
               visible: root.diagnostic.message !== undefined

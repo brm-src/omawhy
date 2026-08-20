@@ -879,6 +879,9 @@ def main(argv=None):
     _add_lang(undo_parser)
     open_rules_parser = subcommands.add_parser("open-rules")
     _add_lang(open_rules_parser)
+    copy_parser = subcommands.add_parser("copy-stdin")
+    _add_lang(copy_parser)
+    copy_parser.add_argument("--text", default="")
 
     args = parser.parse_args(argv)
 
@@ -886,6 +889,15 @@ def main(argv=None):
     LANG = args.lang if args.lang in ("es", "en") else "es"
 
     try:
+        if args.command == "copy-stdin":
+            text = str(args.text or "")
+            try:
+                completed = subprocess.run(["wl-copy"], input=text, text=True, capture_output=True, check=False, timeout=10)
+            except subprocess.TimeoutExpired:
+                raise RuntimeError(_t("El portapapeles no respondió.", "The clipboard did not respond."))
+            if completed.returncode:
+                raise RuntimeError(_t("No pude usar el portapapeles.", "I could not use the clipboard."))
+            return _emit({"ok": True, "message": _t("Copiado al portapapeles.", "Copied to the clipboard.")})
         if args.command == "inspect-at-cursor":
             window = inspect_window_at_cursor(_hypr_json("clients"), _hypr_json("cursorpos"), _hypr_json("monitors"))
             if window is None:
