@@ -677,47 +677,25 @@ def scan_problems(home=None, omarchy_root=None, which_command=None, check_comman
     problems.extend(_conf_sources(home))
     problems.extend(_broken_window_rule_matches(home))
 
-    if check_command is None:
-        def runner(command):
-            return subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False).returncode == 0
-    else:
-        runner = check_command
-
-    hypr_dir = home / ".config" / "hypr"
-    config = "lua" if (hypr_dir / "hyprland.lua").exists() else "classic" if (hypr_dir / "hyprland.conf").exists() else "missing"
-    if config == "missing":
-        problems.append({
-            "severity": "error",
-            "title": _t("No hay configuración activa de Hyprland", "No active Hyprland configuration"),
-            "detail": _t(
-                "No encontré hyprland.lua ni hyprland.conf en " + str(hypr_dir) + ". Sin configuración, Omarchy no puede cargar reglas ni atajos.",
-                "I couldn't find hyprland.lua or hyprland.conf in " + str(hypr_dir) + ". Without a configuration, Omarchy cannot load rules or shortcuts.",
-            ),
-            "path": str(hypr_dir),
-            "line": 0,
-        })
-    if not runner(["hyprctl", "-j", "version"]):
-        problems.append({
-            "severity": "error",
-            "title": _t("Hyprland no responde", "Hyprland is not responding"),
-            "detail": _t(
-                "hyprctl no devuelve versión. Revisa que la sesión Hyprland esté viva antes de culpar a Omarchy.",
-                "hyprctl does not return a version. Make sure the Hyprland session is alive before blaming Omarchy.",
-            ),
-            "path": "",
-            "line": 0,
-        })
-    if not runner(["pgrep", "-x", "quickshell"]):
-        problems.append({
-            "severity": "warning",
-            "title": _t("Quickshell no está corriendo", "Quickshell is not running"),
-            "detail": _t(
-                "El shell de Omarchy no responde; los paneles y plugins no se van a mostrar.",
-                "The Omarchy shell is not responding; panels and plugins will not show.",
-            ),
-            "path": "",
-            "line": 0,
-        })
+    # Reuse the desktop_status engine for runtime checks (active config,
+    # Hyprland responsiveness, Quickshell running, and OmaWhy shortcut).
+    # This keeps scan and the status diagnostic consistent and avoids
+    # duplicating the config / Hyprland / Quickshell checks below.
+    base_status = desktop_status(home=home, omarchy_root=omarchy_root, check_command=check_command)
+    for item in base_status.get("checks", []):
+        if item["state"] == "warning":
+            # desktop_status also reports the OmaWhy shortcut, which is not a
+            # "problem" in the system scan — that check belongs to the pointed
+            # desktop-status diagnostic, not to the broad scan.
+            if item["label"] == _t("Atajo de OmaWhy", "OmaWhy shortcut"):
+                continue
+            problems.append({
+                "severity": "warning",
+                "title": item["label"],
+                "detail": item["detail"],
+                "path": "",
+                "line": 0,
+            })
 
     counts = {"error": 0, "warning": 0, "info": 0}
     for problem in problems:
@@ -865,6 +843,11 @@ def main(argv=None):
     _add_lang(desktop_parser)
     scan_parser = subcommands.add_parser("scan")
     _add_lang(scan_parser)
+    # "why" is an alias of "explain": it answers "why Omarchy did that?"
+    # using the pointed window inspection (same as --window-json).
+    why_parser = subcommands.add_parser("why")
+    _add_lang(why_parser)
+    why_parser.add_argument("--window-json", required=True)
     open_rule_parser = subcommands.add_parser("open-rule")
     _add_lang(open_rule_parser)
     open_rule_parser.add_argument("--path", required=True)
@@ -903,7 +886,7 @@ def main(argv=None):
             if window is None:
                 return _emit({"ok": False, "error": _t("No hay una ventana bajo el cursor.", "There is no window under the cursor.")}, 1)
             return _emit({"ok": True, "window": window})
-        if args.command == "explain":
+        if args.command == "explain" or args.command == "why":
             return _emit({"ok": True, "explanation": explain_window_rules(json.loads(args.window_json))})
         if args.command == "shortcut":
             return _emit({"ok": True, "diagnosis": diagnose_shortcut(args.keys)})

@@ -1,4 +1,5 @@
 import os
+import json
 import subprocess
 import tempfile
 import unittest
@@ -379,6 +380,48 @@ class NormalizeWindowTests(unittest.TestCase):
             self.assertEqual(result["total"], 1)
             self.assertIn("Require a un archivo que no existe", result["problems"][0]["title"])
             self.assertIn("ghost.lua", result["problems"][0]["detail"])
+
+    def test_why_alias_answers_like_explain(self):
+        """The 'why' subcommand is an alias of 'explain'."""
+        window = {"address": "0x1", "class": "test-app", "title": "test-window",
+                  "workspace": {"id": 1}, "monitor": 0, "at": [100, 100],
+                  "size": [200, 200], "xwayland": False}
+        wj = json.dumps(window)
+        env = dict(os.environ)
+        why = subprocess.run(
+            ["python3", "omawhy.py", "why", "--lang", "es", "--window-json", wj],
+            capture_output=True, text=True, env=env,
+        )
+        explain = subprocess.run(
+            ["python3", "omawhy.py", "explain", "--lang", "es", "--window-json", wj],
+            capture_output=True, text=True, env=env,
+        )
+        why_out = json.loads(why.stdout)
+        explain_out = json.loads(explain.stdout)
+        self.assertTrue(why_out["ok"])
+        self.assertTrue(explain_out["ok"])
+        self.assertEqual(why_out["explanation"]["verdict"], explain_out["explanation"]["verdict"])
+
+    def test_scan_does_not_duplicate_desktop_status_checks(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            hypr = home / ".config" / "hypr"
+            hypr.mkdir(parents=True)
+            (hypr / "hyprland.conf").write_text(
+                'windowrulev2=noop, title:test-window\n', encoding="utf-8"
+            )
+            result = scan_problems(
+                home=home,
+                omarchy_root=home / "missing-omarchy",
+                which_command=lambda binary: binary == "nemo",
+                check_command=lambda command: True,
+            )
+            titles = [problem["title"] for problem in result["problems"]]
+            from collections import Counter
+            dups = {t: c for t, c in Counter(titles).items() if c > 1}
+            self.assertEqual(dups, {}, "Duplicated problems: " + str(dups))
+            self.assertNotIn("Atajo de OmaWhy", titles)
+            self.assertNotIn("OmaWhy shortcut", titles)
 
 
 if __name__ == "__main__":
