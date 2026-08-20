@@ -10,11 +10,18 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+LANG = "es"
+
+
+def _t(es, en):
+    """Return the user-facing string for the active language (default: Spanish)."""
+    return es if LANG == "es" else en
+
 
 def _matcher(window):
     identifier = str(window.get("identifier") or "")
     if not identifier:
-        raise ValueError("La ventana no expone app_id/class; no es seguro crear una regla.")
+        raise ValueError(_t("La ventana no expone app_id/class; no es seguro crear una regla.", "The window does not expose app_id/class; it is not safe to create a rule."))
     return "match:class ^(" + re.escape(identifier) + ")$"
 
 
@@ -51,7 +58,7 @@ def build_remembered_lua_rule(window):
     """Generate a Lua rule using only documented Omarchy rule properties."""
     identifier = str(window.get("identifier") or "")
     if not identifier:
-        raise ValueError("La ventana no expone app_id/class; no es seguro crear una regla.")
+        raise ValueError(_t("La ventana no expone app_id/class; no es seguro crear una regla.", "The window does not expose app_id/class; it is not safe to create a rule."))
     matcher = ("^" + re.escape(identifier) + "$").replace("\\", "\\\\").replace('"', '\\"')
     effects = []
     workspace = int(window.get("workspace") or 0)
@@ -122,11 +129,20 @@ def diagnose_shortcut(keys, home=None, omarchy_root=None):
         if path.exists():
             events.extend(event for event in _shortcut_events(path) if event["keys"] == wanted)
     if not events:
-        return {"verdict": "missing", "message": "No encontré un atajo para “" + wanted + "” en la configuración de Omarchy.", "events": []}
+        return {"verdict": "missing", "message": _t(
+            "No encontré un atajo para “" + wanted + "” en la configuración de Omarchy.",
+            "I couldn't find a shortcut for “" + wanted + "” in the Omarchy configuration.",
+        ), "events": []}
     latest = events[-1]
     if latest["action"] == "unbind":
-        return {"verdict": "disabled", "message": "“" + wanted + "” está desactivado en " + Path(latest["path"]).name + ", línea " + str(latest["line"]) + ".", "events": events}
-    return {"verdict": "bound", "message": "“" + wanted + "” ejecuta “" + (latest["label"] or latest["command"]) + "”.", "binding": latest, "events": events}
+        return {"verdict": "disabled", "message": _t(
+            "“" + wanted + "” está desactivado en " + Path(latest["path"]).name + ", línea " + str(latest["line"]) + ".",
+            "“" + wanted + "” is disabled in " + Path(latest["path"]).name + ", line " + str(latest["line"]) + ".",
+        ), "events": events}
+    return {"verdict": "bound", "message": _t(
+        "“" + wanted + "” ejecuta “" + (latest["label"] or latest["command"]) + "”.",
+        "“" + wanted + "” runs “" + (latest["label"] or latest["command"]) + "”.",
+    ), "binding": latest, "events": events}
 
 
 def desktop_status(home=None, omarchy_root=None, check_command=None):
@@ -141,12 +157,12 @@ def desktop_status(home=None, omarchy_root=None, check_command=None):
         runner = check_command
     shortcut = diagnose_shortcut("SUPER + SHIFT + I", home=home, omarchy_root=omarchy_root)
     checks = [
-        {"label": "Configuración de Hyprland", "state": "ok" if config != "missing" else "warning", "detail": "Formato Lua" if config == "lua" else "Formato clásico" if config == "classic" else "No encontré hyprland.lua ni hyprland.conf."},
-        {"label": "Hyprland y Quickshell", "state": "ok" if runner(["hyprctl", "-j", "version"]) and runner(["pgrep", "-x", "quickshell"]) else "warning", "detail": "Ambos procesos responden."},
-        {"label": "Atajo de OmaWhy", "state": "ok" if shortcut["verdict"] == "bound" else "warning", "detail": shortcut["message"]},
+        {"label": _t("Configuración de Hyprland", "Hyprland configuration"), "state": "ok" if config != "missing" else "warning", "detail": _t("Formato Lua", "Lua format") if config == "lua" else _t("Formato clásico", "Classic format") if config == "classic" else _t("No encontré hyprland.lua ni hyprland.conf.", "I couldn't find hyprland.lua or hyprland.conf.")},
+        {"label": _t("Hyprland y Quickshell", "Hyprland and Quickshell"), "state": "ok" if runner(["hyprctl", "-j", "version"]) and runner(["pgrep", "-x", "quickshell"]) else "warning", "detail": _t("Ambos procesos responden.", "Both processes respond.")},
+        {"label": _t("Atajo de OmaWhy", "OmaWhy shortcut"), "state": "ok" if shortcut["verdict"] == "bound" else "warning", "detail": shortcut["message"]},
     ]
     ready = all(check["state"] == "ok" for check in checks)
-    return {"config": config, "checks": checks, "message": "El escritorio base está listo." if ready else "Encontré algo que revisar antes de culpar a Omarchy."}
+    return {"config": config, "checks": checks, "message": _t("El escritorio base está listo.", "The base desktop is ready.") if ready else _t("Encontré algo que revisar antes de culpar a Omarchy.", "I found something to check before blaming Omarchy.")}
 
 
 PLACEMENT_EFFECTS = {"workspace", "monitor", "float", "fullscreen", "pin", "move", "size"}
@@ -407,11 +423,20 @@ def explain_window_rules(window, home=None, omarchy_root=None):
         if "monitor" in first["effects"]:
             facts.append("monitor " + first["effects"]["monitor"])
         if "float" in first["effects"]:
-            facts.append("flotante " + ("sí" if first["effects"]["float"] else "no"))
-        return {"verdict": "placement-rule", "message": "Hay una regla coincidente que puede explicar " + ", ".join(facts) + ".", "matches": matches}
+            facts.append(_t("flotante ", "floating ") + (_t("sí", "yes") if first["effects"]["float"] else _t("no", "no")))
+        return {"verdict": "placement-rule", "message": _t(
+            "Hay una regla coincidente que puede explicar " + ", ".join(facts) + ".",
+            "There is a matching rule that can explain " + ", ".join(facts) + ".",
+        ), "matches": matches}
     if matches:
-        return {"verdict": "style-rule", "message": "Hay reglas coincidentes, pero solo cambian estilo; no el workspace ni el monitor.", "matches": matches}
-    return {"verdict": "no-match", "message": "No encontré una regla estática que coincida. La posición viene del layout, la aplicación o automatización externa.", "matches": []}
+        return {"verdict": "style-rule", "message": _t(
+            "Hay reglas coincidentes, pero solo cambian estilo; no el workspace ni el monitor.",
+            "There are matching rules, but they only change style, not the workspace or monitor.",
+        ), "matches": matches}
+    return {"verdict": "no-match", "message": _t(
+        "No encontré una regla estática que coincida. La posición viene del layout, la aplicación o automatización externa.",
+        "I couldn't find a matching static rule. The position comes from the layout, the app, or external automation.",
+    ), "matches": []}
 
 
 def action_command(action, window, current_workspace=None):
@@ -426,14 +451,14 @@ def action_command(action, window, current_workspace=None):
     if action == "copy-rule":
         return ["wl-copy", "\n".join(build_remembered_rules(window))]
     if not address:
-        raise ValueError("La ventana no tiene dirección Hyprland.")
+        raise ValueError(_t("La ventana no tiene dirección Hyprland.", "The window has no Hyprland address."))
     if not re.fullmatch(r"0x[0-9a-fA-F]+", address):
-        raise ValueError("La dirección Hyprland no es válida.")
+        raise ValueError(_t("La dirección Hyprland no es válida.", "The Hyprland address is invalid."))
     selector = "address:" + address
     if action == "move-current":
         workspace = int(current_workspace or 0)
         if workspace <= 0:
-            raise ValueError("No se pudo determinar el workspace actual.")
+            raise ValueError(_t("No se pudo determinar el workspace actual.", "Could not determine the current workspace."))
         return ["hyprctl", "dispatch", 'hl.dsp.window.move({ workspace = "' + str(workspace) + '", window = "' + selector + '" })']
     dispatches = {
         "center": 'hl.dsp.window.center({ window = "' + selector + '" })',
@@ -442,7 +467,7 @@ def action_command(action, window, current_workspace=None):
         "toggle-pin": 'hl.dsp.window.pin({ action = "toggle", window = "' + selector + '" })',
     }
     if action not in dispatches:
-        raise ValueError("Acción no reconocida: " + action)
+        raise ValueError(_t("Acción no reconocida: ", "Unknown action: ") + action)
     return ["hyprctl", "dispatch", dispatches[action]]
 
 
@@ -505,8 +530,8 @@ def _lua_requires(home, omarchy_root):
                 continue
             problems.append({
                 "severity": "warning",
-                "title": "Require a un archivo que no existe",
-                "detail": "require(\"" + module + "\") no resuelve a " + str(candidate),
+                "title": _t("Require a un archivo que no existe", "Require of a file that does not exist"),
+                "detail": "require(\"" + module + "\") " + _t("no resuelve a ", "does not resolve to ") + str(candidate),
                 "path": str(path),
                 "line": text.count("\n", 0, match.start()) + 1,
             })
@@ -538,8 +563,8 @@ def _conf_sources(home):
             if not exists:
                 problems.append({
                     "severity": "warning",
-                    "title": "Source a un archivo que no existe",
-                    "detail": "source = " + found.group(1).strip() + " no se encuentra",
+                    "title": _t("Source a un archivo que no existe", "Source of a file that does not exist"),
+                    "detail": "source = " + found.group(1).strip() + " " + _t("no se encuentra", "is not found"),
                     "path": str(path),
                     "line": number,
                 })
@@ -560,8 +585,11 @@ def _duplicate_shortcuts(events):
             last = ordered[-1]
             problems.append({
                 "severity": "warning",
-                "title": "Atajo definido más de una vez",
-                "detail": "\"" + keys + "\" se define " + str(len(ordered)) + " veces; gana el último en " + Path(last["path"]).name + ", línea " + str(last["line"]) + ". El resto se ignora en silencio.",
+                "title": _t("Atajo definido más de una vez", "Shortcut defined more than once"),
+                "detail": _t(
+                    "\"" + keys + "\" se define " + str(len(ordered)) + " veces; gana el último en " + Path(last["path"]).name + ", línea " + str(last["line"]) + ". El resto se ignora en silencio.",
+                    "\"" + keys + "\" is defined " + str(len(ordered)) + " times; the last one wins in " + Path(last["path"]).name + ", line " + str(last["line"]) + ". The rest are silently ignored.",
+                ),
                 "path": last["path"],
                 "line": last["line"],
                 "keys": keys,
@@ -591,8 +619,11 @@ def _broken_shortcut_commands(events, which_command=None):
         if not which(binary):
             problems.append({
                 "severity": "error",
-                "title": "Comando apunta a un ejecutable que no existe",
-                "detail": "\"" + binary + "\" no está en el PATH. El atajo \"" + event["keys"] + "\" no va a funcionar hasta que instales el programa o corrijas el comando.",
+                "title": _t("Comando apunta a un ejecutable que no existe", "Command points to a missing executable"),
+                "detail": _t(
+                    "\"" + binary + "\" no está en el PATH. El atajo \"" + event["keys"] + "\" no va a funcionar hasta que instales el programa o corrijas el comando.",
+                    "\"" + binary + "\" is not on the PATH. The shortcut \"" + event["keys"] + "\" will not work until you install the program or fix the command.",
+                ),
                 "path": event["path"],
                 "line": event["line"],
             })
@@ -618,8 +649,11 @@ def _broken_window_rule_matches(home):
                 except re.error as error:
                     problems.append({
                         "severity": "error",
-                        "title": "Regla de ventana con expresión inválida",
-                        "detail": "match:" + matched.group(1) + " " + pattern + " no compila (" + str(error) + "). La regla nunca va a coincidir.",
+                        "title": _t("Regla de ventana con expresión inválida", "Window rule with an invalid expression"),
+                        "detail": _t(
+                            "match:" + matched.group(1) + " " + pattern + " no compila (" + str(error) + "). La regla nunca va a coincidir.",
+                            "match:" + matched.group(1) + " " + pattern + " does not compile (" + str(error) + "). The rule will never match.",
+                        ),
                         "path": str(path),
                         "line": number,
                     })
@@ -654,24 +688,33 @@ def scan_problems(home=None, omarchy_root=None, which_command=None, check_comman
     if config == "missing":
         problems.append({
             "severity": "error",
-            "title": "No hay configuración activa de Hyprland",
-            "detail": "No encontré hyprland.lua ni hyprland.conf en " + str(hypr_dir) + ". Sin configuración, Omarchy no puede cargar reglas ni atajos.",
+            "title": _t("No hay configuración activa de Hyprland", "No active Hyprland configuration"),
+            "detail": _t(
+                "No encontré hyprland.lua ni hyprland.conf en " + str(hypr_dir) + ". Sin configuración, Omarchy no puede cargar reglas ni atajos.",
+                "I couldn't find hyprland.lua or hyprland.conf in " + str(hypr_dir) + ". Without a configuration, Omarchy cannot load rules or shortcuts.",
+            ),
             "path": str(hypr_dir),
             "line": 0,
         })
     if not runner(["hyprctl", "-j", "version"]):
         problems.append({
             "severity": "error",
-            "title": "Hyprland no responde",
-            "detail": "hyprctl no devuelve versión. Revisa que la sesión Hyprland esté viva antes de culpar a Omarchy.",
+            "title": _t("Hyprland no responde", "Hyprland is not responding"),
+            "detail": _t(
+                "hyprctl no devuelve versión. Revisa que la sesión Hyprland esté viva antes de culpar a Omarchy.",
+                "hyprctl does not return a version. Make sure the Hyprland session is alive before blaming Omarchy.",
+            ),
             "path": "",
             "line": 0,
         })
     if not runner(["pgrep", "-x", "quickshell"]):
         problems.append({
             "severity": "warning",
-            "title": "Quickshell no está corriendo",
-            "detail": "El shell de Omarchy no responde; los paneles y plugins no se van a mostrar.",
+            "title": _t("Quickshell no está corriendo", "Quickshell is not running"),
+            "detail": _t(
+                "El shell de Omarchy no responde; los paneles y plugins no se van a mostrar.",
+                "The Omarchy shell is not responding; panels and plugins will not show.",
+            ),
             "path": "",
             "line": 0,
         })
@@ -681,9 +724,12 @@ def scan_problems(home=None, omarchy_root=None, which_command=None, check_comman
         counts[problem["severity"]] = counts.get(problem["severity"], 0) + 1
     total = len(problems)
     message = (
-        "No encontré problemas evidentes."
+        _t("No encontré problemas evidentes.", "I found no obvious problems.")
         if total == 0
-        else "Encontré " + str(total) + " problema" + ("s" if total != 1 else "") + " que revisar."
+        else _t(
+            "Encontré " + str(total) + " problema" + ("s" if total != 1 else "") + " que revisar.",
+            "I found " + str(total) + " problem" + ("s" if total != 1 else "") + " to review.",
+        )
     )
     return {"summary": counts, "total": total, "problems": problems, "message": message}
 
@@ -702,7 +748,7 @@ def _snapshot(path):
 def _reload_hyprland():
     completed = subprocess.run(["hyprctl", "reload"], text=True, capture_output=True, check=False)
     if completed.returncode:
-        raise RuntimeError((completed.stderr or completed.stdout or "Hyprland rechazó la recarga").strip())
+        raise RuntimeError(_t("Hyprland rechazó la recarga", "Hyprland rejected the reload").strip())
 
 
 def remember_window(window, home=None, reload_hyprland=True):
@@ -789,7 +835,7 @@ def normalize_window(raw):
 def _hypr_json(subject):
     completed = subprocess.run(["hyprctl", "-j", subject], text=True, capture_output=True, check=False)
     if completed.returncode:
-        raise RuntimeError((completed.stderr or completed.stdout or "hyprctl falló").strip())
+        raise RuntimeError(_t("hyprctl falló", "hyprctl failed"))
     return json.loads(completed.stdout)
 
 
@@ -803,29 +849,47 @@ def main(argv=None):
 
     parser = argparse.ArgumentParser(description="OmaWhy helper")
     subcommands = parser.add_subparsers(dest="command", required=True)
-    subcommands.add_parser("inspect-at-cursor")
+
+    def _add_lang(p):
+        p.add_argument("--lang", default="es", choices=["es", "en"])
+
+    inspect_parser = subcommands.add_parser("inspect-at-cursor")
+    _add_lang(inspect_parser)
     explain_parser = subcommands.add_parser("explain")
+    _add_lang(explain_parser)
     explain_parser.add_argument("--window-json", required=True)
     shortcut_parser = subcommands.add_parser("shortcut")
+    _add_lang(shortcut_parser)
     shortcut_parser.add_argument("--keys", required=True)
-    subcommands.add_parser("desktop-status")
-    subcommands.add_parser("scan")
+    desktop_parser = subcommands.add_parser("desktop-status")
+    _add_lang(desktop_parser)
+    scan_parser = subcommands.add_parser("scan")
+    _add_lang(scan_parser)
     open_rule_parser = subcommands.add_parser("open-rule")
+    _add_lang(open_rule_parser)
     open_rule_parser.add_argument("--path", required=True)
-    window_parser = subcommands.add_parser("action")
-    window_parser.add_argument("action")
-    window_parser.add_argument("--window-json", required=True)
+    action_parser = subcommands.add_parser("action")
+    _add_lang(action_parser)
+    action_parser.add_argument("action")
+    action_parser.add_argument("--window-json", required=True)
     remember_parser = subcommands.add_parser("remember")
+    _add_lang(remember_parser)
     remember_parser.add_argument("--window-json", required=True)
-    subcommands.add_parser("undo")
-    subcommands.add_parser("open-rules")
+    undo_parser = subcommands.add_parser("undo")
+    _add_lang(undo_parser)
+    open_rules_parser = subcommands.add_parser("open-rules")
+    _add_lang(open_rules_parser)
+
     args = parser.parse_args(argv)
+
+    global LANG
+    LANG = args.lang if args.lang in ("es", "en") else "es"
 
     try:
         if args.command == "inspect-at-cursor":
             window = inspect_window_at_cursor(_hypr_json("clients"), _hypr_json("cursorpos"), _hypr_json("monitors"))
             if window is None:
-                return _emit({"ok": False, "error": "No hay una ventana bajo el cursor."}, 1)
+                return _emit({"ok": False, "error": _t("No hay una ventana bajo el cursor.", "There is no window under the cursor.")}, 1)
             return _emit({"ok": True, "window": window})
         if args.command == "explain":
             return _emit({"ok": True, "explanation": explain_window_rules(json.loads(args.window_json))})
@@ -839,31 +903,31 @@ def main(argv=None):
             path = Path(args.path).expanduser().resolve()
             allowed = [Path.home() / ".config" / "hypr", Path(os.getenv("OMARCHY_PATH", "/usr/share/omarchy")) / "default" / "hypr"]
             if not any(path.is_relative_to(root.resolve()) for root in allowed) or not path.is_file():
-                raise ValueError("La regla no está en una ruta de configuración permitida.")
+                raise ValueError(_t("La regla no está en una ruta de configuración permitida.", "The rule is not in an allowed configuration path."))
             subprocess.Popen(["xdg-open", str(path)])
-            return _emit({"ok": True, "message": "Archivo de regla abierto."})
+            return _emit({"ok": True, "message": _t("Archivo de regla abierto.", "Rule file opened.")})
         if args.command == "action":
             window = json.loads(args.window_json)
             current_workspace = _hypr_json("activeworkspace").get("id") if args.action == "move-current" else None
             completed = subprocess.run(action_command(args.action, window, current_workspace=current_workspace), text=True, capture_output=True, check=False)
             if completed.returncode:
-                raise RuntimeError((completed.stderr or completed.stdout or "La acción falló").strip())
-            return _emit({"ok": True, "message": "Acción aplicada."})
+                raise RuntimeError((completed.stderr or completed.stdout or _t("La acción falló", "The action failed")).strip())
+            return _emit({"ok": True, "message": _t("Acción aplicada.", "Action applied.")})
         if args.command == "remember":
             result = remember_window(json.loads(args.window_json))
-            return _emit({"ok": True, "message": "Regla guardada. Puedes deshacerla.", "rules_file": str(result["rules_file"])})
+            return _emit({"ok": True, "message": _t("Regla guardada. Puedes deshacerla.", "Rule saved. You can undo it."), "rules_file": str(result["rules_file"])})
         if args.command == "undo":
             undone = undo_last_change()
             return _emit(
-                {"ok": True, "message": "Cambio deshecho."}
+                {"ok": True, "message": _t("Cambio deshecho.", "Change undone.")}
                 if undone
-                else {"ok": False, "error": "No hay un cambio de OmaWhy para deshacer."},
+                else {"ok": False, "error": _t("No hay un cambio de OmaWhy para deshacer.", "There is no OmaWhy change to undo.")},
                 0 if undone else 1,
             )
         hypr_dir = Path.home() / ".config" / "hypr"
         rules_file = hypr_dir / "omawhy.lua" if (hypr_dir / "hyprland.lua").exists() else hypr_dir / "apps" / "omawhy.conf"
         subprocess.Popen(["xdg-open", str(rules_file)])
-        return _emit({"ok": True, "message": "Archivo de reglas abierto."})
+        return _emit({"ok": True, "message": _t("Archivo de reglas abierto.", "Rules file opened.")})
     except (ValueError, RuntimeError, json.JSONDecodeError) as error:
         return _emit({"ok": False, "error": str(error)}, 1)
 

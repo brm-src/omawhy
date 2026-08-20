@@ -9,6 +9,8 @@ Item {
 
   readonly property string pluginId: "io.github.brm-src.omawhy"
   readonly property string helperPath: Qt.resolvedUrl("omawhy.py").toString().replace("file://", "")
+  readonly property bool isSpanish: uiLanguage === "es"
+  property string uiLanguage: Qt.locale().name.toLowerCase().startsWith("es") ? "es" : "en"
   property bool opened: false
   property string phase: "home" // home, scan, pick, inspect, confirm, shortcut, status
   property var selected: ({})
@@ -18,6 +20,8 @@ Item {
   property string status: ""
   property var processCallback: null
 
+  function words(es, en) { return root.isSpanish ? es : en }
+
   function open() {
     root.opened = true
     root.phase = "home"
@@ -25,7 +29,7 @@ Item {
     root.explanation = ({})
     root.diagnostic = ({})
     root.scanResult = ({})
-    root.status = "¿Qué quieres entender?"
+    root.status = root.words("¿Qué quieres entender?", "What do you want to understand?")
   }
 
   function close() {
@@ -46,7 +50,7 @@ Item {
   function runHelper(args, callback) {
     if (helper.running) return
     root.processCallback = callback
-    helper.command = ["python3", root.helperPath].concat(args)
+    helper.command = ["python3", root.helperPath].concat(args, ["--lang", root.uiLanguage])
     helper.running = true
   }
 
@@ -55,7 +59,7 @@ Item {
     try {
       payload = JSON.parse(String(raw || "{}"))
     } catch (error) {
-      root.status = "OmaWhy no pudo leer la respuesta del sistema."
+      root.status = root.words("OmaWhy no pudo leer la respuesta del sistema.", "OmaWhy could not read the system response.")
       return
     }
     if (root.processCallback) root.processCallback(payload)
@@ -63,14 +67,14 @@ Item {
   }
 
   function loadExplanation() {
-    root.status = "Buscando reglas que coincidan…"
+    root.status = root.words("Buscando reglas que coincidan…", "Looking for matching rules…")
     root.runHelper(["explain", "--window-json", JSON.stringify(root.selected)], function(payload) {
       if (!payload.ok) {
-        root.status = payload.error || "No se pudieron analizar las reglas."
+        root.status = payload.error || root.words("No se pudieron analizar las reglas.", "Could not analyze the rules.")
         return
       }
       root.explanation = payload.explanation || ({})
-      root.status = root.explanation.message || "Análisis listo."
+      root.status = root.explanation.message || root.words("Análisis listo.", "Analysis ready.")
     })
   }
 
@@ -79,17 +83,17 @@ Item {
     var items = []
     if (effects.workspace) items.push("workspace " + effects.workspace)
     if (effects.monitor) items.push("monitor " + effects.monitor)
-    if (effects.float !== undefined) items.push("flotante " + (effects.float ? "sí" : "no"))
-    if (effects.fullscreen !== undefined) items.push("fullscreen " + (effects.fullscreen ? "sí" : "no"))
-    if (effects.pin !== undefined) items.push("fijada " + (effects.pin ? "sí" : "no"))
+    if (effects.float !== undefined) items.push(root.words("flotante ", "floating ") + (effects.float ? root.words("sí", "yes") : root.words("no", "no")))
+    if (effects.fullscreen !== undefined) items.push("fullscreen " + (effects.fullscreen ? root.words("sí", "yes") : root.words("no", "no")))
+    if (effects.pin !== undefined) items.push(root.words("fijada ", "pinned ") + (effects.pin ? root.words("sí", "yes") : root.words("no", "no")))
     if (effects.opacity) items.push("opacidad " + effects.opacity)
     if (effects.tag) items.push("tag " + effects.tag)
-    return items.length ? items.join(" · ") : "regla coincidente"
+    return items.length ? items.join(" · ") : root.words("regla coincidente", "matching rule")
   }
 
   function openMatchedRule(match) {
     root.runHelper(["open-rule", "--path", String(match.path || "")], function(payload) {
-      root.status = payload.message || payload.error || "Listo."
+      root.status = payload.message || payload.error || root.words("Listo.", "Done.")
     })
   }
 
@@ -101,75 +105,75 @@ Item {
 
   function startWindowQuestion() {
     root.phase = "pick"
-    root.status = "Haz clic sobre la ventana que quedó rara. Esc cancela."
+    root.status = root.words("Haz clic sobre la ventana que quedó rara. Esc cancela.", "Click the window that looks wrong. Esc cancels.")
   }
 
   function inspectShortcut() {
     var keys = shortcutInput.text.trim()
     if (!keys) {
-      root.status = "Escribe un atajo, por ejemplo: Super Shift I."
+      root.status = root.words("Escribe un atajo, por ejemplo: Super Shift I.", "Type a shortcut, for example: Super Shift I.")
       return
     }
-    root.status = "Buscando ese atajo…"
+    root.status = root.words("Buscando ese atajo…", "Looking for that shortcut…")
     root.runHelper(["shortcut", "--keys", keys], function(payload) {
       if (!payload.ok) {
-        root.status = payload.error || "No se pudo revisar el atajo."
+        root.status = payload.error || root.words("No se pudo revisar el atajo.", "Could not check the shortcut.")
         return
       }
       root.diagnostic = payload.diagnosis || ({})
-      root.status = root.diagnostic.message || "Atajo revisado."
+      root.status = root.diagnostic.message || root.words("Atajo revisado.", "Shortcut checked.")
     })
   }
 
   function inspectDesktop() {
-    root.status = "Revisando Hyprland, Quickshell y el atajo…"
+    root.status = root.words("Revisando Hyprland, Quickshell y el atajo…", "Checking Hyprland, Quickshell, and the shortcut…")
     root.runHelper(["desktop-status"], function(payload) {
       if (!payload.ok) {
-        root.status = payload.error || "No se pudo revisar el escritorio."
+        root.status = payload.error || root.words("No se pudo revisar el escritorio.", "Could not check the desktop.")
         return
       }
       root.diagnostic = payload.status || ({})
-      root.status = root.diagnostic.message || "Estado revisado."
+      root.status = root.diagnostic.message || root.words("Estado revisado.", "Status checked.")
     })
   }
 
   function runScan() {
     root.phase = "scan"
     root.scanResult = ({})
-    root.status = "Revisando configuración, atajos y procesos…"
+    root.status = root.words("Revisando configuración, atajos y procesos…", "Checking configuration, shortcuts, and processes…")
     root.runHelper(["scan"], function(payload) {
       if (!payload.ok) {
-        root.status = payload.error || "No se pudo escanear el sistema."
+        root.status = payload.error || root.words("No se pudo escanear el sistema.", "Could not scan the system.")
         return
       }
       root.scanResult = payload.scan || ({})
-      root.status = root.scanResult.message || "Escaneo listo."
+      root.status = root.scanResult.message || root.words("Escaneo listo.", "Scan done.")
     })
   }
 
   function openProblemSource(problem) {
     if (!problem.path) return
     root.runHelper(["open-rule", "--path", String(problem.path)], function(payload) {
-      root.status = payload.message || payload.error || "Listo."
+      root.status = payload.message || payload.error || root.words("Listo.", "Done.")
     })
   }
 
   function severityLabel(severity) {
     if (severity === "error") return "ERROR"
-    if (severity === "warning") return "OJO"
+    if (severity === "warning") return root.words("OJO", "WARN")
     return "INFO"
   }
 
   function inspectAtCursor() {
-    root.status = "Leyendo la ventana…"
+    root.status = root.words("Leyendo la ventana…", "Reading the window…")
     root.runHelper(["inspect-at-cursor"], function(payload) {
       if (!payload.ok) {
-        root.status = payload.error || "No se encontró una ventana."
+        root.status = payload.error || root.words("No se encontró una ventana.", "No window found.")
         return
       }
       root.selected = payload.window
       root.phase = "inspect"
-      root.status = "Ventana inspeccionada."
+      root.status = root.words("Ventana inspeccionada.", "Window inspected.")
       Qt.callLater(root.loadExplanation)
     })
   }
@@ -177,22 +181,22 @@ Item {
   function action(name) {
     if (name === "remember") {
       root.phase = "confirm"
-      root.status = "Revisa la regla antes de guardarla."
+      root.status = root.words("Revisa la regla antes de guardarla.", "Review the rule before saving it.")
       return
     }
     if (name === "undo" || name === "open-rules") {
-      root.runHelper([name], function(payload) { root.status = payload.message || payload.error || "Listo." })
+      root.runHelper([name], function(payload) { root.status = payload.message || payload.error || root.words("Listo.", "Done.") })
       return
     }
     root.runHelper(["action", name, "--window-json", JSON.stringify(root.selected)], function(payload) {
-      root.status = payload.message || payload.error || "Listo."
+      root.status = payload.message || payload.error || root.words("Listo.", "Done.")
     })
   }
 
   function saveRememberedRule() {
     root.runHelper(["remember", "--window-json", JSON.stringify(root.selected)], function(payload) {
       root.phase = "inspect"
-      root.status = payload.message || payload.error || "Listo."
+      root.status = payload.message || payload.error || root.words("Listo.", "Done.")
     })
   }
 
@@ -259,7 +263,7 @@ Item {
           id: hintText
           anchors.fill: parent
           anchors.margins: 16
-          text: "OMAWHY\nHaz clic sobre una ventana para entender por qué está ahí.\n\nEsc para cancelar"
+          text: "OMAWHY\n" + root.words("Haz clic sobre una ventana para entender por qué está ahí.", "Click a window to understand why it is there.") + "\n\n" + root.words("Esc para cancelar", "Esc to cancel")
           color: Color.foreground
           font.family: Style.font.family
           font.pixelSize: 14
@@ -296,7 +300,7 @@ Item {
           }
           Text {
             width: parent.width
-            text: "¿Qué está pasando en Omarchy?"
+            text: root.words("¿Qué está pasando en Omarchy?", "What is happening in Omarchy?")
             color: Color.foreground
             font.family: Style.font.family
             font.pixelSize: 21
@@ -304,7 +308,7 @@ Item {
           }
           Text {
             width: parent.width
-            text: "OmaWhy revisa tu configuración y procesos reales y explica el porqué. Solo reporta lo que puede evidenciar; no inventa causas."
+            text: root.words("OmaWhy revisa tu configuración y procesos reales y explica el porqué. Solo reporta lo que puede evidenciar; no inventa causas.", "OmaWhy inspects your actual configuration and processes and explains why. It only reports what it can verify; it never invents causes.")
             color: Util.alpha(Color.foreground, 0.70)
             font.family: Style.font.family
             font.pixelSize: 12
@@ -323,8 +327,8 @@ Item {
               anchors.fill: parent
               anchors.margins: 10
               spacing: 3
-              Text { text: "Revisar el sistema completo"; color: Color.foreground; font.family: Style.font.family; font.pixelSize: 14; font.bold: true }
-              Text { width: parent.width; text: "Busca atajos rotos, ejecutables inexistentes, fuentes perdidas y reglas inválidas."; color: Util.alpha(Color.foreground, 0.68); font.family: Style.font.family; font.pixelSize: 11; wrapMode: Text.Wrap }
+              Text { text: root.words("Revisar el sistema completo", "Scan the whole system"); color: Color.foreground; font.family: Style.font.family; font.pixelSize: 14; font.bold: true }
+              Text { width: parent.width; text: root.words("Busca atajos rotos, ejecutables inexistentes, fuentes perdidas y reglas inválidas.", "Finds broken shortcuts, missing executables, lost sources, and invalid rules."); color: Util.alpha(Color.foreground, 0.68); font.family: Style.font.family; font.pixelSize: 11; wrapMode: Text.Wrap }
             }
             MouseArea {
               id: scanOptionMouse
@@ -337,7 +341,7 @@ Item {
 
           Text {
             width: parent.width
-            text: "O pregúntale por algo puntual:"
+            text: root.words("O pregúntale por algo puntual:", "Or ask about something specific:")
             color: Util.alpha(Color.foreground, 0.75)
             font.family: Style.font.family
             font.pixelSize: 12
@@ -346,9 +350,9 @@ Item {
 
           Repeater {
             model: [
-              ["Una ventana quedó mal", "¿Por qué abrió aquí, en este monitor o workspace?", "window"],
-              ["Un atajo no funciona", "Busca dónde está definido, reemplazado o desactivado.", "shortcut"],
-              ["Revisar estado del escritorio", "Comprueba Hyprland, Quickshell y el atajo de OmaWhy.", "status"]
+              [root.words("Una ventana quedó mal", "A window looks wrong"), root.words("¿Por qué abrió aquí, en este monitor o workspace?", "Why did it open here, on this monitor or workspace?"), "window"],
+              [root.words("Un atajo no funciona", "A shortcut does not work"), root.words("Busca dónde está definido, reemplazado o desactivado.", "Finds where it is defined, replaced, or disabled."), "shortcut"],
+              [root.words("Revisar estado del escritorio", "Check desktop status"), root.words("Comprueba Hyprland, Quickshell y el atajo de OmaWhy.", "Checks Hyprland, Quickshell, and the OmaWhy shortcut."), "status"]
             ]
             delegate: Rectangle {
               width: homeContent.width
@@ -405,7 +409,7 @@ Item {
             Text { text: "OMAWHY"; color: Color.accent; font.family: Style.font.family; font.pixelSize: 12; font.bold: true; font.letterSpacing: 1.5 }
             Text {
               width: parent.width
-              text: "Revisión del sistema"
+              text: root.words("Revisión del sistema", "System review")
               color: Color.foreground
               font.family: Style.font.family
               font.pixelSize: 20
@@ -433,8 +437,8 @@ Item {
                 anchors.fill: parent
                 anchors.margins: 9
                 text: root.scanResult.total > 0
-                  ? (root.scanResult.summary.error || 0) + " errores · " + (root.scanResult.summary.warning || 0) + " avisos"
-                  : "Todo en orden. No encontré problemas evidentes."
+                  ? (root.scanResult.summary.error || 0) + " " + root.words("errores", "errors") + " · " + (root.scanResult.summary.warning || 0) + " " + root.words("avisos", "warnings")
+                  : root.words("Todo en orden. No encontré problemas evidentes.", "All good. I found no obvious problems.")
                 color: Color.foreground
                 font.family: Style.font.family
                 font.pixelSize: 13
@@ -463,7 +467,7 @@ Item {
                   spacing: 4
                   Text {
                     width: parent.width
-                    text: (modelData.severity === "error" ? "ERROR · " : "OJO · ") + modelData.title
+                    text: (modelData.severity === "error" ? "ERROR · " : root.words("OJO", "WARN") + " · ") + modelData.title
                     color: modelData.severity === "error" ? "#e0705f" : Color.accent
                     font.family: Style.font.family
                     font.pixelSize: 12
@@ -482,7 +486,7 @@ Item {
                   Text {
                     visible: modelData.path
                     width: parent.width
-                    text: (String(modelData.path || "").split("/").pop() || "") + (modelData.line ? ":" + modelData.line : "") + "  ·  abrir archivo"
+                    text: (String(modelData.path || "").split("/").pop() || "") + (modelData.line ? ":" + modelData.line : "") + "  ·  " + root.words("abrir archivo", "open file")
                     color: Util.alpha(Color.foreground, 0.65)
                     font.family: Style.font.family
                     font.pixelSize: 10
@@ -502,12 +506,12 @@ Item {
               spacing: 8
               Rectangle {
                 width: 130; height: 32; radius: 7; color: scanAgain.containsMouse ? Util.alpha(Color.accent, 0.82) : Color.accent
-                Text { anchors.centerIn: parent; text: "Escanear otra vez"; color: Color.background; font.family: Style.font.family; font.pixelSize: 12; font.bold: true }
+                Text { anchors.centerIn: parent; text: root.words("Escanear otra vez", "Scan again"); color: Color.background; font.family: Style.font.family; font.pixelSize: 12; font.bold: true }
                 MouseArea { id: scanAgain; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.runScan() }
               }
               Rectangle {
                 width: 88; height: 32; radius: 7; color: Util.alpha(Color.foreground, 0.12)
-                Text { anchors.centerIn: parent; text: "Volver"; color: Color.foreground; font.family: Style.font.family; font.pixelSize: 12 }
+                Text { anchors.centerIn: parent; text: root.words("Volver", "Back"); color: Color.foreground; font.family: Style.font.family; font.pixelSize: 12 }
                 MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.open() }
               }
             }
@@ -541,7 +545,7 @@ Item {
 
             Text {
               width: parent.width
-              text: root.phase === "confirm" ? "RECORDAR ESTA POSICIÓN" : "OMAWHY"
+              text: root.phase === "confirm" ? root.words("RECORDAR ESTA POSICIÓN", "REMEMBER THIS POSITION") : "OMAWHY"
               color: Color.accent
               font.family: Style.font.family
               font.pixelSize: 12
@@ -551,7 +555,7 @@ Item {
 
             Text {
               width: parent.width
-              text: String(root.selected.title || "Ventana sin título")
+              text: String(root.selected.title || root.words("Ventana sin título", "Window without title"))
               color: Color.foreground
               font.family: Style.font.family
               font.pixelSize: 20
@@ -563,15 +567,15 @@ Item {
 
             Repeater {
               model: [
-                [root.selected.identifier_kind === "class" ? "Class" : "App ID", root.selected.identifier],
-                ["Título", root.selected.title],
-                ["Workspace", root.selected.workspace],
-                ["Monitor", root.selected.monitor],
-                ["Flotante", root.selected.floating ? "sí" : "no"],
-                ["Pantalla completa", root.selected.fullscreen ? "sí" : "no"],
-                ["Fijada", root.selected.pinned ? "sí" : "no"],
-                ["PID", root.selected.pid],
-                ["Dirección", root.selected.address]
+                [root.words("Class", "Class"), root.selected.identifier_kind === "class" ? "Class" : "App ID", root.selected.identifier],
+                [root.words("Título", "Title"), root.selected.title],
+                [root.words("Workspace", "Workspace"), root.selected.workspace],
+                [root.words("Monitor", "Monitor"), root.selected.monitor],
+                [root.words("Flotante", "Floating"), root.selected.floating ? root.words("sí", "yes") : root.words("no", "no")],
+                [root.words("Pantalla completa", "Fullscreen"), root.selected.fullscreen ? root.words("sí", "yes") : root.words("no", "no")],
+                [root.words("Fijada", "Pinned"), root.selected.pinned ? root.words("sí", "yes") : root.words("no", "no")],
+                [root.words("PID", "PID"), root.selected.pid],
+                [root.words("Dirección", "Address"), root.selected.address]
               ]
               delegate: Row {
                 width: content.width
@@ -666,7 +670,7 @@ Item {
                     elide: Text.ElideRight
                   }
                   Text {
-                    text: "Abrir archivo"
+                    text: root.words("Abrir archivo", "Open file")
                     color: Color.foreground
                     font.family: Style.font.family
                     font.pixelSize: 11
@@ -686,7 +690,7 @@ Item {
             Text {
               visible: root.phase === "confirm"
               width: parent.width
-              text: "Se escribirá una regla limitada a esta aplicación en la configuración activa de Hyprland. OmaWhy crea un backup y puedes deshacer el último cambio."
+              text: root.words("Se escribirá una regla limitada a esta aplicación en la configuración activa de Hyprland. OmaWhy crea un backup y puedes deshacer el último cambio.", "A scoped rule will be written for this application in the active Hyprland config. OmaWhy creates a backup and you can undo the last change.")
               wrapMode: Text.Wrap
               textFormat: Text.PlainText
               color: Util.alpha(Color.foreground, 0.72)
@@ -701,10 +705,10 @@ Item {
               spacing: 7
               Repeater {
                 model: [
-                  ["Copiar App ID", "copy-app-id"], ["Copiar Class", "copy-class"], ["Copiar título", "copy-title"],
-                  ["Copiar regla", "copy-rule"], ["Mover aquí", "move-current"], ["Centrar", "center"],
-                  ["Alternar flotante", "toggle-floating"], ["Alternar pantalla completa", "toggle-fullscreen"], ["Fijar", "toggle-pin"], ["Abrir reglas", "open-rules"],
-                  ["Deshacer", "undo"], ["Recordar", "remember"]
+                  [root.words("Copiar App ID", "Copy App ID"), "copy-app-id"], [root.words("Copiar Class", "Copy Class"), "copy-class"], [root.words("Copiar título", "Copy title"), "copy-title"],
+                  [root.words("Copiar regla", "Copy rule"), "copy-rule"], [root.words("Mover aquí", "Move here"), "move-current"], [root.words("Centrar", "Center"), "center"],
+                  [root.words("Alternar flotante", "Toggle floating"), "toggle-floating"], [root.words("Alternar pantalla completa", "Toggle fullscreen"), "toggle-fullscreen"], [root.words("Fijar", "Pin"), "toggle-pin"], [root.words("Abrir reglas", "Open rules"), "open-rules"],
+                  [root.words("Deshacer", "Undo"), "undo"], [root.words("Recordar", "Remember"), "remember"]
                 ]
                 delegate: Rectangle {
                   width: actionText.implicitWidth + 20
@@ -735,12 +739,12 @@ Item {
               spacing: 8
               Rectangle {
                 width: 112; height: 32; radius: 7; color: Color.accent
-                Text { anchors.centerIn: parent; text: "Recordar"; color: Color.background; font.family: Style.font.family; font.bold: true; font.pixelSize: 12 }
+                Text { anchors.centerIn: parent; text: root.words("Recordar", "Remember"); color: Color.background; font.family: Style.font.family; font.bold: true; font.pixelSize: 12 }
                 MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.saveRememberedRule() }
               }
               Rectangle {
                 width: 88; height: 32; radius: 7; color: Util.alpha(Color.foreground, 0.12)
-                Text { anchors.centerIn: parent; text: "Cancelar"; color: Color.foreground; font.family: Style.font.family; font.pixelSize: 12 }
+                Text { anchors.centerIn: parent; text: root.words("Cancelar", "Cancel"); color: Color.foreground; font.family: Style.font.family; font.pixelSize: 12 }
                 MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.phase = "inspect" }
               }
             }
@@ -793,7 +797,7 @@ Item {
             Text {
               visible: root.phase === "shortcut"
               width: parent.width
-              text: "Escríbelo como lo presionas: Super Shift I, Super Return, etc."
+              text: root.words("Escríbelo como lo presionas: Super Shift I, Super Return, etc.", "Write it as you press it: Super Shift I, Super Return, etc.")
               color: Util.alpha(Color.foreground, 0.68)
               font.family: Style.font.family
               font.pixelSize: 12
@@ -803,19 +807,19 @@ Item {
               id: shortcutInput
               visible: root.phase === "shortcut"
               width: parent.width
-              placeholderText: "Ejemplo: Super Shift I"
+              placeholderText: root.words("Ejemplo: Super Shift I", "Example: Super Shift I")
               onAccepted: root.inspectShortcut()
             }
             Rectangle {
               visible: root.phase === "shortcut"
               width: 96; height: 31; radius: 7; color: shortcutButton.containsMouse ? Util.alpha(Color.accent, 0.82) : Color.accent
-              Text { anchors.centerIn: parent; text: "Revisar"; color: Color.background; font.family: Style.font.family; font.pixelSize: 12; font.bold: true }
+              Text { anchors.centerIn: parent; text: root.words("Revisar", "Check"); color: Color.background; font.family: Style.font.family; font.pixelSize: 12; font.bold: true }
               MouseArea { id: shortcutButton; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.inspectShortcut() }
             }
             Text {
               visible: root.phase === "status"
               width: parent.width
-              text: "Esto revisa si la configuración activa existe, si Hyprland y Quickshell responden, y si el atajo de OmaWhy está definido."
+              text: root.words("Esto revisa si la configuración activa existe, si Hyprland y Quickshell responden, y si el atajo de OmaWhy está definido.", "This checks whether the active config exists, whether Hyprland and Quickshell respond, and whether the OmaWhy shortcut is defined.")
               color: Util.alpha(Color.foreground, 0.68)
               font.family: Style.font.family
               font.pixelSize: 12
@@ -824,7 +828,7 @@ Item {
             Rectangle {
               visible: root.phase === "status"
               width: 110; height: 31; radius: 7; color: statusButton.containsMouse ? Util.alpha(Color.accent, 0.82) : Color.accent
-              Text { anchors.centerIn: parent; text: "Revisar otra vez"; color: Color.background; font.family: Style.font.family; font.pixelSize: 12; font.bold: true }
+              Text { anchors.centerIn: parent; text: root.words("Revisar otra vez", "Check again"); color: Color.background; font.family: Style.font.family; font.pixelSize: 12; font.bold: true }
               MouseArea { id: statusButton; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.inspectDesktop() }
             }
             Rectangle {
@@ -870,7 +874,7 @@ Item {
             Text {
               visible: root.phase === "shortcut" && root.diagnostic.binding !== undefined
               width: parent.width
-              text: "Definido en " + String(root.diagnostic.binding.path || "").split("/").pop() + ", línea " + root.diagnostic.binding.line + "."
+              text: root.words("Definido en ", "Defined in ") + String(root.diagnostic.binding.path || "").split("/").pop() + (root.diagnostic.line ? (", " + root.words("línea", "line") + " " + root.diagnostic.binding.line : "") + ".")
               color: Util.alpha(Color.foreground, 0.68)
               font.family: Style.font.family
               font.pixelSize: 11
@@ -878,7 +882,7 @@ Item {
             }
             Text {
               visible: root.phase === "shortcut" && root.diagnostic.events !== undefined && root.diagnostic.events.length > 0
-              text: "Abrir archivo"
+              text: root.words("Abrir archivo", "Open file")
               color: Color.accent
               font.family: Style.font.family
               font.pixelSize: 12
@@ -886,7 +890,7 @@ Item {
               MouseArea { id: shortcutSourceMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.openShortcutSource() }
             }
             Text {
-              text: "Volver"
+              text: root.words("Volver", "Back")
               color: Color.accent
               font.family: Style.font.family
               font.pixelSize: 12
