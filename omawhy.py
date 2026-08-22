@@ -98,14 +98,17 @@ def _normalize_shortcut(keys):
 
 def _shortcut_events(path):
     text = path.read_text(encoding="utf-8", errors="replace")
+    # Drop Lua comment lines (-- ...) so commented-out example binds are not
+    # reported as real shortcut problems.
+    active_text = "\n".join("" if line.lstrip().startswith("--") else line for line in text.splitlines())
     events = []
     lua_bind = re.compile(r"o\.bind\(\s*[\"'](?P<keys>[^\"']+)[\"']\s*,\s*(?P<label>nil|[\"'][^\"']*[\"'])\s*,\s*(?P<command>[\"'][^\"']*[\"']|\{)")
-    for match in lua_bind.finditer(text):
+    for match in lua_bind.finditer(active_text):
         label = match.group("label")
         command = match.group("command")
-        events.append((match.start(), {"action": "bind", "keys": _normalize_shortcut(match.group("keys")), "label": "" if label == "nil" else label[1:-1], "command": "comando compuesto" if command == "{" else command[1:-1], "path": str(path), "line": text.count("\n", 0, match.start()) + 1}))
-    for match in re.finditer(r"hl\.unbind\(\s*[\"']([^\"']+)[\"']\s*\)", text):
-        events.append((match.start(), {"action": "unbind", "keys": _normalize_shortcut(match.group(1)), "path": str(path), "line": text.count("\n", 0, match.start()) + 1}))
+        events.append((match.start(), {"action": "bind", "keys": _normalize_shortcut(match.group("keys")), "label": "" if label == "nil" else label[1:-1], "command": "comando compuesto" if command == "{" else command[1:-1], "path": str(path), "line": active_text.count("\n", 0, match.start()) + 1}))
+    for match in re.finditer(r"hl\.unbind\(\s*[\"']([^\"']+)[\"']\s*\)", active_text):
+        events.append((match.start(), {"action": "unbind", "keys": _normalize_shortcut(match.group(1)), "path": str(path), "line": active_text.count("\n", 0, match.start()) + 1}))
     for number, line in enumerate(text.splitlines(), 1):
         match = re.match(r"\s*bindd?\s*=\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*(.+)$", line)
         if match:
