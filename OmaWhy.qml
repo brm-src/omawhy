@@ -152,6 +152,20 @@ Item {
     })
   }
 
+  function runPerf() {
+    root.phase = "scan"
+    root.scanResult = ({})
+    root.status = root.words("Midiendo CPU, memoria, temperatura, disco y batería…", "Measuring CPU, memory, temperature, disk, and battery…")
+    root.runHelper(["perf"], function(payload) {
+      if (!payload.ok) {
+        root.status = payload.error || root.words("No se pudieron tomar las mediciones.", "Could not take the measurements.")
+        return
+      }
+      root.scanResult = payload.scan || ({})
+      root.status = root.scanResult.message || root.words("Mediciones listas.", "Measurements done.")
+    })
+  }
+
   function openProblemSource(problem) {
     if (!problem.path) return
     root.runHelper(["open-rule", "--path", String(problem.path)], function(payload) {
@@ -384,6 +398,30 @@ Item {
               hoverEnabled: true
               cursorShape: Qt.PointingHandCursor
               onClicked: root.runScan()
+            }
+          }
+
+          Rectangle {
+            width: homeContent.width
+            height: perfOptionContent.implicitHeight + 18
+            radius: Style.cornerRadius
+            color: perfOptionMouse.containsMouse ? Style.selectedFillFor(Color.menu.text, Color.accent) : Style.normalFillFor(Color.menu.text, Color.accent)
+            border.width: 1
+            border.color: Util.alpha(Color.accent, 0.55)
+            Column {
+              id: perfOptionContent
+              anchors.fill: parent
+              anchors.margins: 10
+              spacing: 3
+              Text { text: root.words("¿Por qué va lento o está caliente?", "Why is it slow or hot?"); color: Color.menu.text; font.family: Style.font.menuFamily; font.pixelSize: Style.font.body; font.bold: true }
+              Text { width: parent.width; text: root.words("Mide CPU, memoria, temperatura, disco y batería, y nombra a los culpables con evidencia.", "Measures CPU, memory, temperature, disk, and battery, and names the culprits with evidence."); color: Util.alpha(Color.menu.text, 0.68); font.family: Style.font.menuFamily; font.pixelSize: Style.font.bodySmall; wrapMode: Text.Wrap }
+            }
+            MouseArea {
+              id: perfOptionMouse
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: Qt.PointingHandCursor
+              onClicked: root.runPerf()
             }
           }
 

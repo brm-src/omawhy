@@ -715,6 +715,199 @@ def scan_problems(home=None, omarchy_root=None, which_command=None, check_comman
     return {"summary": counts, "total": total, "problems": problems, "message": message}
 
 
+def perf_problems(ps_output=None, loadavg_text=None, meminfo_text=None,
+                  temp_output=None, temp_command=None, disk_usage_fn=None,
+                  battery_root=None):
+    """Answer "why is it slow or hot?" with verifiable evidence only.
+
+    Every finding comes from a real measurement (ps, /proc/loadavg,
+    /proc/meminfo, sensors, filesystem usage, power_supply sysfs).
+    """
+    problems = []
+
+    # Top CPU consumers: anything burning half a core right now.
+    if ps_output is None:
+        completed = subprocess.run(["ps", "-eo", "pcpu=,pmem=,comm="],
+                                   capture_output=True, text=True, timeout=15, check=False)
+        ps_output = completed.stdout
+    procs = []
+    for line in str(ps_output).splitlines():
+        parts = line.split(None, 2)
+        if len(parts) == 3:
+            try:
+                procs.append((float(parts[0]), float(parts[1]), parts[2]))
+            except ValueError:
+                pass
+    procs.sort(key=lambda item: item[0], reverse=True)
+    hot = [item for item in procs if item[0] >= 50.0]
+    for cpu, _mem, comm in hot[:3]:
+        problems.append({
+            "severity": "error" if cpu >= 80 else "warning",
+            "title": _t("CPU ocupada por " + comm, comm + " is using the CPU"),
+            "detail": _t(
+                "Está usando " + str(round(cpu)) + "% de la CPU ahora mismo. Si no lo estás usando a propósito, ciérralo y revisa si el equipo se aclara.",
+                "It is using " + str(round(cpu)) + "% of the CPU right now. If you are not using it on purpose, close it and see if the machine speeds up.",
+            ),
+            "path": "",
+            "line": 0,
+        })
+
+    # Load average versus available cores.
+    if loadavg_text is None:
+        try:
+            loadavg_text = Path("/proc/loadavg").read_text(encoding="utf-8")
+        except OSError:
+            loadavg_text = ""
+    try:
+        load1 = float(str(loadavg_text).split()[0])
+        cores = os.cpu_count() or 1
+        if load1 > cores * 1.5:
+            problems.append({
+                "severity": "warning",
+                "title": _t("Carga alta para tus núcleos", "High load for your cores"),
+                "detail": _t(
+                    "La carga de 1 minuto es " + str(load1) + " y tienes " + str(cores) + " núcleos: hay más trabajo en cola del que el equipo puede ejecutar.",
+                    "The 1-minute load is " + str(load1) + " and you have " + str(cores) + " cores: more work is queued than the machine can run.",
+                ),
+                "path": "",
+                "line": 0,
+            })
+    except (ValueError, IndexError):
+        pass
+
+    # Memory pressure from /proc/meminfo.
+    if meminfo_text is None:
+        try:
+            meminfo_text = Path("/proc/meminfo").read_text(encoding="utf-8")
+        except OSError:
+            meminfo_text = ""
+    meminfo = {}
+    for line in str(meminfo_text).splitlines():
+        fields = line.split(":")
+        if len(fields) == 2:
+            number = re.search(r"\d+", fields[1])
+            meminfo[fields[0]] = int(number.group()) if number else 0
+    total_kb = meminfo.get("MemTotal", 0)
+    avail_kb = meminfo.get("MemAvailable", 0)
+    if total_kb > 0 and avail_kb < total_kb * 0.1:
+        used_pct = round((total_kb - avail_kb) * 100 / total_kb)
+        problems.append({
+            "severity": "warning",
+            "title": _t("Memoria casi llena", "Memory almost full"),
+            "detail": _t(
+                "Solo queda " + str(100 - used_pct) + "% de RAM disponible; el sistema puede estar intercambiando a disco, que es mucho más lento.",
+                "Only " + str(100 - used_pct) + "% of RAM is available; the system may be swapping to disk, which is much slower.",
+            ),
+            "path": "",
+            "line": 0,
+        })
+    swap_total = meminfo.get("SwapTotal", 0)
+    swap_free = meminfo.get("SwapFree", 0)
+    if swap_total > 0 and swap_free == 0:
+        problems.append({
+            "severity": "info",
+            "title": _t("Swap lleno", "Swap full"),
+            "detail": _t(
+                "Toda la partición de intercambio está en uso junto con poca RAM libre.",
+                "All swap space is in use while free memory is low.",
+            ),
+            "path": "",
+            "line": 0,
+        })
+
+    # Temperature via lm-sensors (highest reading wins).
+    if temp_command is None:
+        def run_sensors():
+            completed = subprocess.run(["sensors"], capture_output=True, text=True, timeout=10, check=False)
+            return completed.stdout
+    else:
+        run_sensors = temp_command
+    if temp_output is None and shutil.which("sensors"):
+        temp_output = run_sensors()
+    temps = []
+    for match in re.finditer(r"temp\d+_input:\s*([0-9.]+)", str(temp_output or "")):
+        temps.append(float(match.group(1)))
+    if temps:
+        hottest = max(temps)
+        if hottest >= 85:
+            problems.append({
+                "severity": "error" if hottest >= 95 else "warning",
+                "title": _t("Temperatura alta", "High temperature"),
+                "detail": _t(
+                    "El sensor más caliente marca " + str(round(hottest)) + "°C. Con calor sostenido la CPU se reduce sola y todo va más lento.",
+                    "The hottest sensor reads " + str(round(hottest)) + "°C. Under sustained heat the CPU throttles itself and everything slows down.",
+                ),
+                "path": "",
+                "line": 0,
+            })
+
+    # Root filesystem usage.
+    if disk_usage_fn is None:
+        disk_usage_fn = shutil.disk_usage
+    try:
+        usage = disk_usage_fn("/")
+        used_pct = round(usage.used * 100 / usage.total)
+        if used_pct >= 90:
+            problems.append({
+                "severity": "error" if used_pct >= 97 else "warning",
+                "title": _t("Disco casi lleno", "Disk almost full"),
+                "detail": _t(
+                    "La raíz está al " + str(used_pct) + "%. Un disco lleno ralentiza escrituras y puede impedir iniciar sesión.",
+                    "The root filesystem is at " + str(used_pct) + "%. A full disk slows writes and can block login.",
+                ),
+                "path": "",
+                "line": 0,
+            })
+    except OSError:
+        pass
+
+    # Battery state: on battery power, name the biggest current consumers.
+    if battery_root is None:
+        battery_root = Path("/sys/class/power_supply")
+    try:
+        supplies = list(Path(battery_root).glob("BAT*"))
+    except OSError:
+        supplies = []
+    for supply in supplies:
+        try:
+            status = (supply / "status").read_text(encoding="utf-8").strip()
+            capacity = int(re.sub(r"\D", "", (supply / "capacity").read_text(encoding="utf-8").strip()) or 0)
+        except (OSError, ValueError):
+            continue
+        if capacity <= 20 and status == _battery_discharging_label():
+            problems.append({
+                "severity": "warning",
+                "title": _t("Batería baja (" + str(capacity) + "%)", "Low battery (" + str(capacity) + "%)"),
+                "detail": _t(
+                    "Estás usando batería y queda poco. Los mayores consumidores de CPU ahora mismo son: " +
+                    ", ".join(comm for _c, _m, comm in procs[:3]) + ".",
+                    "You are on battery and it is running low. The biggest CPU consumers right now are: " +
+                    ", ".join(comm for _c, _m, comm in procs[:3]) + ".",
+                ),
+                "path": "",
+                "line": 0,
+            })
+        break
+
+    counts = {"error": 0, "warning": 0, "info": 0}
+    for problem in problems:
+        counts[problem["severity"]] = counts.get(problem["severity"], 0) + 1
+    total = len(problems)
+    message = (
+        _t("No medí nada anormal: ni CPU, ni memoria, ni temperatura, ni disco explican lentitud.", "Nothing abnormal measured: CPU, memory, temperature, and disk do not explain slowness.")
+        if total == 0
+        else _t(
+            "Encontré " + str(total) + " causa" + ("s" if total != 1 else "") + " posible" + ("s" if total != 1 else "") + " de lentitud o calor.",
+            "I found " + str(total) + " possible cause" + ("s" if total != 1 else "") + " of slowness or heat.",
+        )
+    )
+    return {"summary": counts, "total": total, "problems": problems, "message": message}
+
+
+def _battery_discharging_label():
+    return "Discharging"
+
+
 def _atomic_write(path, text):
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(path.name + ".tmp")
@@ -846,6 +1039,8 @@ def main(argv=None):
     _add_lang(desktop_parser)
     scan_parser = subcommands.add_parser("scan")
     _add_lang(scan_parser)
+    perf_parser = subcommands.add_parser("perf")
+    _add_lang(perf_parser)
     # "why" is an alias of "explain": it answers "why Omarchy did that?"
     # using the pointed window inspection (same as --window-json).
     why_parser = subcommands.add_parser("why")
@@ -897,6 +1092,8 @@ def main(argv=None):
             return _emit({"ok": True, "status": desktop_status()})
         if args.command == "scan":
             return _emit({"ok": True, "scan": scan_problems()})
+        if args.command == "perf":
+            return _emit({"ok": True, "scan": perf_problems()})
         if args.command == "open-rule":
             path = Path(args.path).expanduser().resolve()
             allowed = [Path.home() / ".config" / "hypr", Path(os.getenv("OMARCHY_PATH", "/usr/share/omarchy")) / "default" / "hypr"]
