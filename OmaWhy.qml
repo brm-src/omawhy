@@ -1,5 +1,6 @@
 import Quickshell
 import Quickshell.Io
+import Quickshell.Wayland
 import QtQuick
 import qs.Commons
 import qs.Ui
@@ -236,18 +237,17 @@ Item {
     }
   }
 
-  Component {
-    id: sectionHeader
-    Text {
-      property alias label: text
-      width: parent.width
-      color: Color.accent
-      font.family: Style.font.menuFamily
-      font.pixelSize: 10
-      font.bold: true
-      font.letterSpacing: 1.0
-      elide: Text.ElideRight
-    }
+  component SectionHeader: Text {
+    id: sectionHeaderText
+    property string label: ""
+    width: parent.width
+    text: sectionHeaderText.label
+    color: Color.accent
+    font.family: Style.font.menuFamily
+    font.pixelSize: Style.font.caption
+    font.bold: true
+    font.letterSpacing: 1.0
+    elide: Text.ElideRight
   }
 
   Variants {
@@ -272,7 +272,6 @@ Item {
           event.accepted = true
         }
       }
-      focus: true
 
       Rectangle {
         anchors.fill: parent
@@ -309,9 +308,9 @@ Item {
           anchors.fill: parent
           anchors.margins: 16
           text: "OMAWHY\n" + root.words("Haz clic sobre una ventana para entender por qué está ahí.", "Click a window to understand why it is there.") + "\n\n" + root.words("Esc para cancelar", "Esc to cancel")
-          color: Color.foreground
-          font.family: Style.font.family
-          font.pixelSize: 14
+          color: Color.menu.text
+          font.family: Style.font.menuFamily
+          font.pixelSize: Style.font.body
           lineHeight: 1.25
           wrapMode: Text.Wrap
           textFormat: Text.PlainText
@@ -342,25 +341,25 @@ Item {
           Text {
             text: "OMAWHY"
             color: Color.accent
-            font.family: Style.font.family
-            font.pixelSize: 12
+            font.family: Style.font.menuFamily
+            font.pixelSize: Style.font.body
             font.bold: true
             font.letterSpacing: 1.5
           }
           Text {
             width: parent.width
             text: root.words("¿Por qué Omarchy?", "Why Omarchy?")
-            color: Color.foreground
-            font.family: Style.font.family
-            font.pixelSize: 21
+            color: Color.menu.text
+            font.family: Style.font.menuFamily
+            font.pixelSize: Style.font.title
             font.bold: true
           }
           Text {
             width: parent.width
             text: root.words("OmaWhy revisa tu configuración y procesos reales y explica el porqué. Solo reporta lo que puede evidenciar; no inventa causas.", "OmaWhy inspects your actual configuration and processes and explains why. It only reports what it can verify; it never invents causes.")
-            color: Util.alpha(Color.foreground, 0.70)
-            font.family: Style.font.family
-            font.pixelSize: 12
+            color: Util.alpha(Color.menu.text, 0.70)
+            font.family: Style.font.menuFamily
+            font.pixelSize: Style.font.body
             wrapMode: Text.Wrap
           }
 
@@ -368,7 +367,7 @@ Item {
             width: homeContent.width
             height: scanOptionContent.implicitHeight + 18
             radius: Style.cornerRadius
-            color: scanOptionMouse.containsMouse ? Style.selectedFillFor(Color.foreground, Color.accent) : Style.normalFillFor(Color.foreground, Color.accent)
+            color: scanOptionMouse.containsMouse ? Style.selectedFillFor(Color.menu.text, Color.accent) : Style.normalFillFor(Color.menu.text, Color.accent)
             border.width: 1
             border.color: Util.alpha(Color.accent, 0.55)
             Column {
@@ -376,8 +375,8 @@ Item {
               anchors.fill: parent
               anchors.margins: 10
               spacing: 3
-              Text { text: root.words("Revisar el sistema completo", "Scan the whole system"); color: Color.foreground; font.family: Style.font.menuFamily; font.pixelSize: 14; font.bold: true }
-              Text { width: parent.width; text: root.words("Busca atajos rotos, ejecutables inexistentes, fuentes perdidas y reglas inválidas.", "Finds broken shortcuts, missing executables, lost sources, and invalid rules."); color: Util.alpha(Color.foreground, 0.68); font.family: Style.font.menuFamily; font.pixelSize: 11; wrapMode: Text.Wrap }
+              Text { text: root.words("Revisar el sistema completo", "Scan the whole system"); color: Color.menu.text; font.family: Style.font.menuFamily; font.pixelSize: Style.font.body; font.bold: true }
+              Text { width: parent.width; text: root.words("Busca atajos rotos, ejecutables inexistentes, fuentes perdidas y reglas inválidas.", "Finds broken shortcuts, missing executables, lost sources, and invalid rules."); color: Util.alpha(Color.menu.text, 0.68); font.family: Style.font.menuFamily; font.pixelSize: Style.font.bodySmall; wrapMode: Text.Wrap }
             }
             MouseArea {
               id: scanOptionMouse
@@ -391,9 +390,9 @@ Item {
           Text {
             width: parent.width
             text: root.words("O pregúntale por algo puntual:", "Or ask about something specific:")
-            color: Util.alpha(Color.foreground, 0.75)
-            font.family: Style.font.family
-            font.pixelSize: 12
+            color: Util.alpha(Color.menu.text, 0.75)
+            font.family: Style.font.menuFamily
+            font.pixelSize: Style.font.body
             font.bold: true
           }
 
@@ -407,15 +406,15 @@ Item {
               width: homeContent.width
               height: optionContent.implicitHeight + 20
               radius: Style.cornerRadius
-              color: optionMouse.containsMouse ? Style.hoverFillFor(Color.foreground, Color.accent) : Style.normalFillFor(Color.foreground, Color.accent)
+              color: optionMouse.containsMouse ? Style.hoverFillFor(Color.menu.text, Color.accent) : Style.normalFillFor(Color.menu.text, Color.accent)
               border.width: 0
               Column {
                 id: optionContent
                 anchors.fill: parent
                 anchors.margins: 10
                 spacing: 3
-                Text { text: modelData[0]; color: Color.foreground; font.family: Style.font.menuFamily; font.pixelSize: 14; font.bold: true }
-                Text { width: parent.width; text: modelData[1]; color: Util.alpha(Color.foreground, 0.68); font.family: Style.font.menuFamily; font.pixelSize: 11; wrapMode: Text.Wrap }
+                Text { text: modelData[0]; color: Color.menu.text; font.family: Style.font.menuFamily; font.pixelSize: Style.font.body; font.bold: true }
+                Text { width: parent.width; text: modelData[1]; color: Util.alpha(Color.menu.text, 0.68); font.family: Style.font.menuFamily; font.pixelSize: Style.font.bodySmall; wrapMode: Text.Wrap }
               }
               MouseArea {
                 id: optionMouse
@@ -460,22 +459,22 @@ Item {
             id: scanContent
             width: parent.width
             spacing: 10
-            Text { text: "OMAWHY"; color: Color.accent; font.family: Style.font.family; font.pixelSize: 12; font.bold: true; font.letterSpacing: 1.5 }
+            Text { text: "OMAWHY"; color: Color.accent; font.family: Style.font.menuFamily; font.pixelSize: Style.font.body; font.bold: true; font.letterSpacing: 1.5 }
             Text {
               width: parent.width
               text: root.words("Revisión del sistema", "System review")
-              color: Color.foreground
-              font.family: Style.font.family
-              font.pixelSize: 20
+              color: Color.menu.text
+              font.family: Style.font.menuFamily
+              font.pixelSize: Style.font.title
               font.bold: true
               wrapMode: Text.Wrap
             }
             Text {
               width: parent.width
               text: root.status
-              color: Util.alpha(Color.foreground, 0.70)
-              font.family: Style.font.family
-              font.pixelSize: 12
+              color: Util.alpha(Color.menu.text, 0.70)
+              font.family: Style.font.menuFamily
+              font.pixelSize: Style.font.body
               wrapMode: Text.Wrap
             }
             Rectangle {
@@ -493,9 +492,9 @@ Item {
                 text: root.scanResult.total > 0
                   ? (root.scanResult.summary.error || 0) + " " + root.words("errores", "errors") + " · " + (root.scanResult.summary.warning || 0) + " " + root.words("avisos", "warnings")
                   : root.words("Todo en orden. No encontré problemas evidentes.", "All good. I found no obvious problems.")
-                color: Color.foreground
-                font.family: Style.font.family
-                font.pixelSize: 13
+                color: Color.menu.text
+                font.family: Style.font.menuFamily
+                font.pixelSize: Style.font.body
                 font.bold: true
                 wrapMode: Text.Wrap
               }
@@ -508,12 +507,12 @@ Item {
                 height: problemColumn.implicitHeight + 16
                 radius: 8
                 color: modelData.severity === "error"
-                  ? Util.alpha("#d65a4a", 0.20)
-                  : Util.alpha(Color.foreground, 0.08)
+                  ? Util.alpha(Color.urgent, 0.20)
+                  : Util.alpha(Color.menu.text, 0.08)
                 border.width: 1
                 border.color: modelData.severity === "error"
-                  ? Util.alpha("#d65a4a", 0.6)
-                  : Util.alpha(Color.foreground, 0.16)
+                  ? Util.alpha(Color.urgent, 0.6)
+                  : Util.alpha(Color.menu.text, 0.16)
                 Column {
                   id: problemColumn
                   anchors.fill: parent
@@ -522,18 +521,18 @@ Item {
                   Text {
                     width: parent.width
                     text: (modelData.severity === "error" ? "ERROR · " : root.words("OJO", "WARN") + " · ") + modelData.title
-                    color: modelData.severity === "error" ? "#e0705f" : Color.accent
-                    font.family: Style.font.family
-                    font.pixelSize: 12
+                    color: modelData.severity === "error" ? Color.urgent : Color.accent
+                    font.family: Style.font.menuFamily
+                    font.pixelSize: Style.font.body
                     font.bold: true
                     wrapMode: Text.Wrap
                   }
                   Text {
                     width: parent.width
                     text: String(modelData.detail || "")
-                    color: Color.foreground
-                    font.family: Style.font.family
-                    font.pixelSize: 11
+                    color: Color.menu.text
+                    font.family: Style.font.menuFamily
+                    font.pixelSize: Style.font.bodySmall
                     wrapMode: Text.Wrap
                     textFormat: Text.PlainText
                   }
@@ -541,9 +540,9 @@ Item {
                     visible: modelData.path
                     width: parent.width
                     text: (String(modelData.path || "").split("/").pop() || "") + (modelData.line ? ":" + modelData.line : "") + "  ·  " + root.words("abrir archivo", "open file")
-                    color: Util.alpha(Color.foreground, 0.65)
-                    font.family: Style.font.family
-                    font.pixelSize: 10
+                    color: Util.alpha(Color.menu.text, 0.65)
+                    font.family: Style.font.menuFamily
+                    font.pixelSize: Style.font.caption
                     font.underline: problemSourceMouse.containsMouse
                     MouseArea {
                       id: problemSourceMouse
@@ -618,8 +617,8 @@ Item {
               width: parent.width
               text: root.phase === "confirm" ? root.words("RECORDAR ESTA POSICIÓN", "REMEMBER THIS POSITION") : "OMAWHY"
               color: Color.accent
-              font.family: Style.font.family
-              font.pixelSize: 12
+              font.family: Style.font.menuFamily
+              font.pixelSize: Style.font.body
               font.bold: true
               font.letterSpacing: 1.5
             }
@@ -627,14 +626,14 @@ Item {
             Text {
               width: parent.width
               text: String(root.selected.title || root.words("Ventana sin título", "Window without title"))
-              color: Color.foreground
-              font.family: Style.font.family
-              font.pixelSize: 20
+              color: Color.menu.text
+              font.family: Style.font.menuFamily
+              font.pixelSize: Style.font.title
               font.bold: true
               elide: Text.ElideRight
             }
 
-            Rectangle { width: parent.width; height: 1; color: Util.alpha(Color.foreground, 0.18) }
+            Rectangle { width: parent.width; height: 1; color: Util.alpha(Color.menu.text, 0.18) }
 
             Repeater {
               model: [
@@ -654,16 +653,16 @@ Item {
                 Text {
                   width: 145
                   text: modelData[0]
-                  color: Util.alpha(Color.foreground, 0.58)
-                  font.family: Style.font.family
-                  font.pixelSize: 12
+                  color: Util.alpha(Color.menu.text, 0.58)
+                  font.family: Style.font.menuFamily
+                  font.pixelSize: Style.font.body
                 }
                 Text {
                   width: parent.width - 157
                   text: String(modelData[1] || "—")
-                  color: Color.foreground
-                  font.family: Style.font.family
-                  font.pixelSize: 12
+                  color: Color.menu.text
+                  font.family: Style.font.menuFamily
+                  font.pixelSize: Style.font.body
                   elide: Text.ElideRight
                 }
               }
@@ -676,11 +675,11 @@ Item {
               radius: 9
               color: root.explanation.verdict === "placement-rule"
                 ? Util.alpha(Color.accent, 0.18)
-                : Util.alpha(Color.foreground, 0.08)
+                : Util.alpha(Color.menu.text, 0.08)
               border.width: 1
               border.color: root.explanation.verdict === "placement-rule"
                 ? Util.alpha(Color.accent, 0.75)
-                : Util.alpha(Color.foreground, 0.18)
+                : Util.alpha(Color.menu.text, 0.18)
 
               Column {
                 id: whyColumn
@@ -693,18 +692,18 @@ Item {
                     : root.explanation.verdict === "style-rule"
                       ? "HAY REGLAS, PERO NO MUEVEN LA VENTANA"
                       : "NO HAY REGLA ESTÁTICA COINCIDENTE"
-                  color: root.explanation.verdict === "placement-rule" ? Color.accent : Color.foreground
-                  font.family: Style.font.family
-                  font.pixelSize: 11
+                  color: root.explanation.verdict === "placement-rule" ? Color.accent : Color.menu.text
+                  font.family: Style.font.menuFamily
+                  font.pixelSize: Style.font.bodySmall
                   font.bold: true
                   font.letterSpacing: 1
                 }
                 Text {
                   width: parent.width
                   text: root.explanation.message || ""
-                  color: Color.foreground
-                  font.family: Style.font.family
-                  font.pixelSize: 12
+                  color: Color.menu.text
+                  font.family: Style.font.menuFamily
+                  font.pixelSize: Style.font.body
                   wrapMode: Text.Wrap
                   textFormat: Text.PlainText
                 }
@@ -718,7 +717,7 @@ Item {
                 width: content.width
                 height: sourceColumn.implicitHeight + 18
                 radius: 8
-                color: Util.alpha(Color.foreground, 0.06)
+                color: Util.alpha(Color.menu.text, 0.06)
                 Column {
                   id: sourceColumn
                   anchors.fill: parent
@@ -728,23 +727,23 @@ Item {
                     width: parent.width
                     text: String(modelData.path || "").split("/").pop() + ":" + modelData.line + " · " + root.effectText(modelData)
                     color: Color.accent
-                    font.family: Style.font.family
-                    font.pixelSize: 11
+                    font.family: Style.font.menuFamily
+                    font.pixelSize: Style.font.bodySmall
                     elide: Text.ElideRight
                   }
                   Text {
                     width: parent.width
                     text: modelData.rule || ""
-                    color: Util.alpha(Color.foreground, 0.70)
-                    font.family: Style.font.family
-                    font.pixelSize: 10
+                    color: Util.alpha(Color.menu.text, 0.70)
+                    font.family: Style.font.menuFamily
+                    font.pixelSize: Style.font.caption
                     elide: Text.ElideRight
                   }
                   Text {
                     text: root.words("Abrir archivo", "Open file")
-                    color: Color.foreground
-                    font.family: Style.font.family
-                    font.pixelSize: 11
+                    color: Color.menu.text
+                    font.family: Style.font.menuFamily
+                    font.pixelSize: Style.font.bodySmall
                     font.underline: sourceMouse.containsMouse
                     MouseArea {
                       id: sourceMouse
@@ -764,9 +763,9 @@ Item {
               text: root.words("Se escribirá una regla limitada a esta aplicación en la configuración activa de Hyprland. OmaWhy crea un backup y puedes deshacer el último cambio.", "A scoped rule will be written for this application in the active Hyprland config. OmaWhy creates a backup and you can undo the last change.")
               wrapMode: Text.Wrap
               textFormat: Text.PlainText
-              color: Util.alpha(Color.foreground, 0.72)
-              font.family: Style.font.family
-              font.pixelSize: 12
+              color: Util.alpha(Color.menu.text, 0.72)
+              font.family: Style.font.menuFamily
+              font.pixelSize: Style.font.body
               lineHeight: 1.2
             }
 
@@ -775,10 +774,7 @@ Item {
               width: parent.width
               spacing: Style.spacing.xs
 
-              Loader {
-                sourceComponent: sectionHeader
-                property string text: root.words("COPIAR", "COPY")
-              }
+              SectionHeader { label: root.words("COPIAR", "COPY") }
 
               Flow {
                 width: parent.width
@@ -796,8 +792,8 @@ Item {
                   }
                 }
               }
-              Ui.PanelSeparator {}
-              Loader { sourceComponent: sectionHeader; property string text: root.words("VENTANA", "WINDOW") }
+              PanelSeparator { foreground: Color.menu.text }
+              SectionHeader { label: root.words("VENTANA", "WINDOW") }
               Flow {
                 width: parent.width
                 spacing: Style.spacing.sm
@@ -815,8 +811,8 @@ Item {
                   }
                 }
               }
-              Ui.PanelSeparator {}
-              Loader { sourceComponent: sectionHeader; property string text: root.words("REGLAS", "RULES") }
+              PanelSeparator { foreground: Color.menu.text }
+              SectionHeader { label: root.words("REGLAS", "RULES") }
               Flow {
                 width: parent.width
                 spacing: Style.spacing.sm
@@ -858,9 +854,9 @@ Item {
             Text {
               width: parent.width
               text: root.status
-              color: Util.alpha(Color.foreground, 0.65)
-              font.family: Style.font.family
-              font.pixelSize: 11
+              color: Util.alpha(Color.menu.text, 0.65)
+              font.family: Style.font.menuFamily
+              font.pixelSize: Style.font.bodySmall
               wrapMode: Text.Wrap
               textFormat: Text.PlainText
             }
@@ -894,13 +890,13 @@ Item {
             id: diagnosticContent
             width: parent.width
             spacing: 10
-            Text { text: "OMAWHY"; color: Color.accent; font.family: Style.font.family; font.pixelSize: 12; font.bold: true; font.letterSpacing: 1.5 }
+            Text { text: "OMAWHY"; color: Color.accent; font.family: Style.font.menuFamily; font.pixelSize: Style.font.body; font.bold: true; font.letterSpacing: 1.5 }
             Text {
               width: parent.width
               text: root.phase === "shortcut" ? "¿Por qué no funciona este atajo?" : "¿Está sano el escritorio?"
-              color: Color.foreground
-              font.family: Style.font.family
-              font.pixelSize: 20
+              color: Color.menu.text
+              font.family: Style.font.menuFamily
+              font.pixelSize: Style.font.title
               font.bold: true
               wrapMode: Text.Wrap
             }
@@ -908,12 +904,12 @@ Item {
               visible: root.phase === "shortcut"
               width: parent.width
               text: root.words("Escríbelo como lo presionas: Super Shift I, Super Return, etc.", "Write it as you press it: Super Shift I, Super Return, etc.")
-              color: Util.alpha(Color.foreground, 0.68)
-              font.family: Style.font.family
-              font.pixelSize: 12
+              color: Util.alpha(Color.menu.text, 0.68)
+              font.family: Style.font.menuFamily
+              font.pixelSize: Style.font.body
               wrapMode: Text.Wrap
             }
-            Ui.TextField {
+            TextField {
               id: shortcutInput
               visible: root.phase === "shortcut"
               width: parent.width
@@ -933,9 +929,9 @@ Item {
               visible: root.phase === "status"
               width: parent.width
               text: root.words("Esto revisa si la configuración activa existe, si Hyprland y Quickshell responden, y si el atajo de OmaWhy está definido.", "This checks whether the active config exists, whether Hyprland and Quickshell respond, and whether the OmaWhy shortcut is defined.")
-              color: Util.alpha(Color.foreground, 0.68)
-              font.family: Style.font.family
-              font.pixelSize: 12
+              color: Util.alpha(Color.menu.text, 0.68)
+              font.family: Style.font.menuFamily
+              font.pixelSize: Style.font.body
               wrapMode: Text.Wrap
             }
             Button {
@@ -952,15 +948,15 @@ Item {
               width: parent.width
               height: resultText.implicitHeight + 20
               radius: 9
-              color: Util.alpha(Color.foreground, 0.08)
+              color: Util.alpha(Color.menu.text, 0.08)
               Text {
                 id: resultText
                 anchors.fill: parent
                 anchors.margins: 10
                 text: root.diagnostic.message || ""
-                color: Color.foreground
-                font.family: Style.font.family
-                font.pixelSize: 13
+                color: Color.menu.text
+                font.family: Style.font.menuFamily
+                font.pixelSize: Style.font.body
                 wrapMode: Text.Wrap
                 textFormat: Text.PlainText
               }
@@ -972,15 +968,15 @@ Item {
                 width: diagnosticContent.width
                 height: checkText.implicitHeight + 18
                 radius: 8
-                color: modelData.state === "ok" ? Util.alpha(Color.accent, 0.12) : Util.alpha(Color.foreground, 0.10)
+                color: modelData.state === "ok" ? Util.alpha(Color.accent, 0.12) : Util.alpha(Color.menu.text, 0.10)
                 Text {
                   id: checkText
                   anchors.fill: parent
                   anchors.margins: 9
                   text: (modelData.state === "ok" ? "✓ " : "! ") + modelData.label + "\n" + modelData.detail
-                  color: Color.foreground
-                  font.family: Style.font.family
-                  font.pixelSize: 12
+                  color: Color.menu.text
+                  font.family: Style.font.menuFamily
+                  font.pixelSize: Style.font.body
                   lineHeight: 1.2
                   wrapMode: Text.Wrap
                   textFormat: Text.PlainText
@@ -990,30 +986,30 @@ Item {
             Text {
               visible: root.phase === "shortcut" && root.diagnostic.binding !== undefined
               width: parent.width
-              text: root.words("Definido en ", "Defined in ") + String(root.diagnostic.binding.path || "").split("/").pop() + (root.diagnostic.line ? (", " + root.words("línea", "line") + " " + root.diagnostic.binding.line : "") + ".")
-              color: Util.alpha(Color.foreground, 0.68)
-              font.family: Style.font.family
-              font.pixelSize: 11
+              text: root.words("Definido en ", "Defined in ") + String(root.diagnostic.binding.path || "").split("/").pop() + (root.diagnostic.line ? (", " + root.words("línea", "line") + " " + root.diagnostic.binding.line) : "" + ".")
+              color: Util.alpha(Color.menu.text, 0.68)
+              font.family: Style.font.menuFamily
+              font.pixelSize: Style.font.bodySmall
               wrapMode: Text.Wrap
             }
             Text {
               visible: root.phase === "shortcut" && root.diagnostic.events !== undefined && root.diagnostic.events.length > 0
               text: root.words("Abrir archivo", "Open file")
               color: Color.accent
-              font.family: Style.font.family
-              font.pixelSize: 12
+              font.family: Style.font.menuFamily
+              font.pixelSize: Style.font.body
               font.underline: shortcutSourceMouse.containsMouse
               MouseArea { id: shortcutSourceMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.openShortcutSource() }
             }
             Text {
               text: root.words("Volver", "Back")
               color: Color.accent
-              font.family: Style.font.family
-              font.pixelSize: 12
+              font.family: Style.font.menuFamily
+              font.pixelSize: Style.font.body
               font.underline: backMouse.containsMouse
               MouseArea { id: backMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.open() }
             }
-            Text { width: parent.width; text: root.status; color: Util.alpha(Color.foreground, 0.65); font.family: Style.font.family; font.pixelSize: 11; wrapMode: Text.Wrap; textFormat: Text.PlainText }
+            Text { width: parent.width; text: root.status; color: Util.alpha(Color.menu.text, 0.65); font.family: Style.font.menuFamily; font.pixelSize: Style.font.bodySmall; wrapMode: Text.Wrap; textFormat: Text.PlainText }
           }
         }
       }
