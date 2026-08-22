@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "io.github.brm-src.omawhy",
   "name": "OmaWhy",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "author": "brm-src",
   "license": "MIT",
   "description": "Ask why Omarchy did that: scan the system, diagnose windows, shortcuts, and desktop readiness.",
